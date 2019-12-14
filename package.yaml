@@ -1,0 +1,68 @@
+name: counter
+version: '1.0.0'
+executables:
+  counter:
+    main: Main.hs
+    source-dirs: src
+    dependencies:
+      - counter
+      - aeson
+      - base
+      - envy
+      - wai
+      - warp
+      - http-types
+      - postgresql-simple
+      - containers
+      - QuickCheck
+      - bytestring
+
+library:
+  source-dirs: lib
+  dependencies:
+    - aeson
+    - base
+    - bytestring
+    - containers
+    - envy
+    - http-types
+    - postgresql-simple
+    - matrix
+    - string-conversions
+    - text
+    - QuickCheck
+    - vector
+    - wai
+    - warp
+  ghc-options:
+    - -Wall
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+
+tests:
+  unit-tests:
+    main: Main.hs
+    source-dirs: test
+    dependencies:
+      - counter
+      - aeson
+      - base
+      - bytestring
+      - containers
+      - envy
+      - http-types
+      - hspec
+      - postgresql-simple
+      - QuickCheck
+      - matrix
+      - string-conversions
+      - text
+      - vector
+      - wai
+      - warp
+    ghc-options:
+      - -Wall
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
