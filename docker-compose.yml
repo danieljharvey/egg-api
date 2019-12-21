@@ -1,6 +1,7 @@
 version: '2'
 services:
   web:
+    container_name: egg-api
     build: .
     ports:
       - '8080:80'

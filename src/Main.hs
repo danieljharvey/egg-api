@@ -1,33 +1,28 @@
-{-# LANGUAGE DeriveAnyClass    #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-import           Control.Monad.IO.Class
--- import Egg.EventTypes
-
-import qualified Data.Aeson                 as JSON
-import qualified Data.ByteString.Char8      as BS8
-import qualified Data.ByteString.Lazy.Char8 as BSL8
-import           Data.Function              ((&))
-import qualified Data.Map                   as Map
-import           Data.Monoid                ((<>))
-import           Data.String
-import qualified Data.String                as String
+import Control.Monad.Reader
+import qualified Data.Aeson as JSON
+import qualified Data.ByteString.Char8 as BS8
+import qualified Data.Map as Map
+import qualified Data.Text as Tx
 import qualified Database.PostgreSQL.Simple as SQL
-import qualified Egg.API                    as API
-import qualified Egg.EventStore             as EventStore
-import qualified Egg.SampleProjections      as Sample
-import qualified Network.HTTP.Types         as HTTP
-import qualified Network.Wai                as Wai
-import qualified Network.Wai.Handler.Warp   as Warp
-import qualified System.Envy                as Envy
+import qualified Egg.API as API
+import qualified Egg.DB as DB
+import qualified Egg.EggM as Egg
+import qualified Egg.EventStore as EventStore
+import qualified Egg.SampleProjections as Sample
+import qualified Network.HTTP.Types as HTTP
+import qualified Network.Wai as Wai
+import qualified Network.Wai.Handler.Warp as Warp
+import qualified System.Envy as Envy
 
 type EventRow =
   (Int, JSON.Value)
-
-tableCreateString :: (IsString a) => a
-tableCreateString = "CREATE TABLE IF NOT EXISTS events (ID serial NOT NULL PRIMARY KEY, info json NOT NULL);"
 
 main :: IO ()
 main = do
@@ -35,86 +30,61 @@ main = do
   case config' of
     Nothing -> putStrLn "Could not read env vars"
     Just config -> do
-      print config
-      let settings = makeSettings config
-      connection <- SQL.connectPostgreSQL (configDatabase config)
-      createSchema connection
+      let settings = DB.makeSettings config
+      connection <- SQL.connectPostgreSQL (DB.configDatabase config)
+      DB.createSchema connection
       projections' <- EventStore.createMVar Sample.eggBoardProjection
-      Warp.runSettings settings (application API.sampleAPI projections' connection)
-
-createSchema :: SQL.Connection -> IO ()
-createSchema connection =
-  SQL.execute_ connection tableCreateString
-    >> pure ()
-
-data Config
-  = Config
-      { configDatabase :: BS8.ByteString,
-        configHost     :: Warp.HostPreference,
-        configPort     :: Warp.Port
-      }
-  deriving (Eq, Show)
-
-instance Envy.FromEnv Config where
-  fromEnv = do
-    database <- Envy.env "DATABASE"
-    host <- Envy.env "HOST"
-    port <- Envy.env "PORT"
-    pure Config
-      { configDatabase = database,
-        configHost = String.fromString host,
-        configPort = read port
-      }
-
-makeSettings :: Config -> Warp.Settings
-makeSettings config =
-  Warp.defaultSettings & Warp.setHost (configHost config)
-    & Warp.setPort (configPort config)
-
-writeEvent :: SQL.Connection -> Wai.Request -> IO [EventRow]
-writeEvent connection request = do
-  json <- liftIO (Wai.requestBody request)
-  SQL.withTransaction
-    connection
-    ( do
-        _ <-
-          SQL.execute
-            connection
-            "INSERT INTO events (info) VALUES (?);"
-            [json]
-        allEvents <-
-          SQL.query_
-            connection
-            "SELECT * FROM events"
-        pure allEvents
-    )
-
-eventListToMap :: [EventRow] -> EventStore.EventList
-eventListToMap = Map.fromList
+      let eggConfig = Egg.makeConfig connection projections' API.sampleAPI
+      Warp.runSettings settings (application eggConfig)
 
 application ::
   (JSON.FromJSON action, Show state) =>
-  API.API state ->
-  EventStore.StatefulProjection action state ->
-  SQL.Connection ->
+  Egg.EggConfig (Egg.EggM action state) action state ->
   Wai.Application
-application api projection connection request respond =
+application config request respond =
+  runReaderT (Egg.runEggM (requestHandler request)) config >>= respond
+
+requestHandler ::
+  ( JSON.FromJSON action,
+    Show state,
+    MonadIO m,
+    MonadReader (Egg.EggConfig m action state) m
+  ) =>
+  Wai.Request ->
+  m Wai.Response
+requestHandler request =
   if Wai.requestMethod request == HTTP.methodPost
-  then do
-      -- post means plop an event in the store
-      allEvents' <- writeEvent connection request
-      plops <- EventStore.runStatefulProjection projection (eventListToMap allEvents')
-      let status = HTTP.status200
-      let headers = []
-      let body = BSL8.pack (show plops) <> ".\n"
-      respond (Wai.responseLBS status headers body)
-  else do
-    -- lets assume this is get and try and access the API
-    response <- API.runAPI projection api (Wai.pathInfo request)
-    case response of
-      Just a -> respond (Wai.responseLBS HTTP.status400 [] (JSON.encode a))
-      Nothing ->
-        respond (Wai.responseLBS HTTP.status400 [] "No response!")
+    then (liftIO $ Wai.requestBody request) >>= handlePostRequest
+    else handleGetRequest (Wai.pathInfo request)
 
+-- post means plop an event in the store
+handlePostRequest ::
+  ( JSON.FromJSON action,
+    Show state,
+    MonadReader (Egg.EggConfig m action state) m
+  ) =>
+  BS8.ByteString ->
+  m Wai.Response
+handlePostRequest jsonStr = do
+  -- write the event
+  _ <- asks Egg.writeEvent >>= (\f -> f jsonStr)
+  let status = HTTP.status200
+  let headers = []
+  let body = "Saved!"
+  pure (Wai.responseLBS status headers body)
 
-
+handleGetRequest ::
+  ( JSON.FromJSON action,
+    MonadReader (Egg.EggConfig m action state) m
+  ) =>
+  [Tx.Text] ->
+  m Wai.Response
+handleGetRequest args = do
+  -- lets assume this is get and try and access the API
+  newEvents <- join (asks Egg.getEvents)
+  _ <- asks Egg.runProjection >>= (\f -> f newEvents)
+  response <- asks Egg.runAPI >>= (\a -> a args)
+  case response of
+    Just a -> pure (Wai.responseLBS HTTP.status400 [] (JSON.encode a))
+    Nothing ->
+      pure (Wai.responseLBS HTTP.status400 [] "No response!")

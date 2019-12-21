@@ -1,11 +1,11 @@
-name: counter
+name: egg-api
 version: '1.0.0'
 executables:
-  counter:
+  app:
     main: Main.hs
     source-dirs: src
     dependencies:
-      - counter
+      - egg-api
       - aeson
       - base
       - envy
@@ -14,6 +14,8 @@ executables:
       - http-types
       - postgresql-simple
       - containers
+      - mtl
+      - text
       - QuickCheck
       - bytestring
 
@@ -27,11 +29,10 @@ library:
     - envy
     - http-types
     - postgresql-simple
-    - matrix
+    - mtl
     - string-conversions
     - text
     - QuickCheck
-    - vector
     - wai
     - warp
   ghc-options:
@@ -43,9 +44,10 @@ library:
 tests:
   unit-tests:
     main: Main.hs
-    source-dirs: test
+    source-dirs: 
+      - test
+      - lib
     dependencies:
-      - counter
       - aeson
       - base
       - bytestring
@@ -54,11 +56,10 @@ tests:
       - http-types
       - hspec
       - postgresql-simple
+      - mtl
       - QuickCheck
-      - matrix
       - string-conversions
       - text
-      - vector
       - wai
       - warp
     ghc-options:
