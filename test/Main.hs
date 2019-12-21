@@ -39,17 +39,15 @@ main = hspec $ do
       fst val `shouldBe` Map.fromList [(1, JSON.toJSON Reset)]
     it "Writes an event" $ do
       let val = runTestEggM' (InternalTestState 0 [] $ EventStore.def testProjection) $ do
-            writeEvent <- asks Egg.writeEvent
-            writeEvent (toStrict $ JSON.encode Up)
-            writeEvent (toStrict $ JSON.encode Down)
+            Egg.writeEvent (toStrict $ JSON.encode Up)
+            Egg.writeEvent (toStrict $ JSON.encode Down)
             Egg.getEvents
       fst val `shouldBe` Map.fromList [(1, JSON.toJSON Up), (2, JSON.toJSON Down)]
     it "Runs a projection" $ do
       let val = runTestEggM' (InternalTestState 0 [] $ EventStore.def testProjection) $ do
-            writeEvent <- asks Egg.writeEvent
-            writeEvent (toStrict $ JSON.encode Up)
-            writeEvent (toStrict $ JSON.encode Down)
-            writeEvent (toStrict $ JSON.encode Up)
+            Egg.writeEvent (toStrict $ JSON.encode Up)
+            Egg.writeEvent (toStrict $ JSON.encode Down)
+            Egg.writeEvent (toStrict $ JSON.encode Up)
             events <- Egg.getEvents
             runProjection' <- asks Egg.runProjection
             runProjection' events
@@ -59,13 +57,12 @@ main = hspec $ do
       (iLastKeyUsed <$> snd) val `shouldBe` 4
     it "Runs a projection in parts gives same result" $ do
       let val = runTestEggM' (InternalTestState 0 [] $ EventStore.def testProjection) $ do
-            writeEvent <- asks Egg.writeEvent
             runProjection' <- asks Egg.runProjection
-            writeEvent (toStrict $ JSON.encode Up)
+            Egg.writeEvent (toStrict $ JSON.encode Up)
             _ <- Egg.getEvents >>= runProjection'
-            writeEvent (toStrict $ JSON.encode Down)
+            Egg.writeEvent (toStrict $ JSON.encode Down)
             _ <- Egg.getEvents >>= runProjection'
-            writeEvent (toStrict $ JSON.encode Up)
+            Egg.writeEvent (toStrict $ JSON.encode Up)
             Egg.getEvents >>= runProjection'
       -- whats the answer?
       fst val `shouldBe` 1
@@ -122,6 +119,15 @@ instance Egg.GetEvents (TestEggM state) where
   getEvents =
     Map.fromList <$> zip [(1 :: Int) ..] <$> iAllEvents <$> get
 
+instance Egg.WriteEvent (TestEggM state) where
+  writeEvent bs =
+    modify $
+      ( \(InternalTestState i es s) ->
+          case JSON.decode (fromStrict bs) of
+            Just action -> (InternalTestState i (es <> [action]) s)
+            Nothing -> InternalTestState i es s
+      )
+
 maxKey :: EventStore.EventList -> Int
 maxKey as = Map.foldrWithKey (\k _ k' -> max k k') 0 as
 
@@ -130,13 +136,6 @@ stateConfig ::
 stateConfig =
   Egg.EggConfig
     { Egg.dbConnection = undefined,
-      Egg.writeEvent = \bs ->
-        modify $
-          ( \(InternalTestState i es s) ->
-              case JSON.decode (fromStrict bs) of
-                Just action -> (InternalTestState i (es <> [action]) s)
-                Nothing -> InternalTestState i es s
-          ),
       Egg.runAPI = \_tx -> pure Nothing,
       Egg.runProjection = \events -> do
         (InternalTestState startAt es oldState) <- get
