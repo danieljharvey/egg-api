@@ -12,5 +12,6 @@ jobs:
     - name: Run a one-line script
       run: sudo apt-get install libpq-dev
     - name: Run a multi-line script
-      run: |
+      run: 
+        stack build
         stack test
