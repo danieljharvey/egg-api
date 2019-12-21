@@ -9,9 +9,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - name: Run a one-line script
+    - name: Install libpq-dev
       run: sudo apt-get install libpq-dev
-    - name: Run a multi-line script
-      run: 
-        stack build
-        stack test
+    - name: Run stack build
+      run: stack build
+    - name: Run stack test
+      run: stack test
+
