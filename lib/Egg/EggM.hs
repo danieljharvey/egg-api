@@ -24,11 +24,14 @@ data EggConfig m action state
   = EggConfig
       { dbConnection :: SQL.Connection,
         writeEvent :: BS8.ByteString -> m (),
-        getEvents :: m EventStore.EventList,
+        -- getEvents :: m EventStore.EventList,
         runAPI :: [Tx.Text] -> m (Maybe JSON.Value),
         runProjection :: EventStore.EventList -> m state,
         getMostRecentIndex :: m Int
       }
+
+class (Monad m) => GetEvents m where
+  getEvents :: m EventStore.EventList
 
 makeConfig ::
   JSON.FromJSON action =>
@@ -40,7 +43,7 @@ makeConfig c p api' =
   EggConfig
     { dbConnection = c,
       writeEvent = writeEvent',
-      getEvents = getEvents',
+      -- getEvents = getEvents',
       runAPI = API.runAPI p api',
       runProjection = EventStore.runStatefulProjection p,
       getMostRecentIndex = EventStore.getMostRecentIndex p
@@ -55,6 +58,9 @@ newtype EggM action state t
       MonadIO,
       MonadReader (EggConfig (EggM action state) action state)
     )
+
+instance GetEvents (EggM action state) where
+  getEvents = getEvents'
 
 dbExecute ::
   (SQL.ToRow q) =>

@@ -35,14 +35,14 @@ main = hspec $ do
               $ asks Egg.getMostRecentIndex
       fst val `shouldBe` 10
     it "Passes through events" $ do
-      let val = runTestEggM' (InternalTestState 0 [JSON.toJSON Reset] $ EventStore.def testProjection) $ (join (asks Egg.getEvents))
+      let val = runTestEggM' (InternalTestState 0 [JSON.toJSON Reset] $ EventStore.def testProjection) $ Egg.getEvents
       fst val `shouldBe` Map.fromList [(1, JSON.toJSON Reset)]
     it "Writes an event" $ do
       let val = runTestEggM' (InternalTestState 0 [] $ EventStore.def testProjection) $ do
             writeEvent <- asks Egg.writeEvent
             writeEvent (toStrict $ JSON.encode Up)
             writeEvent (toStrict $ JSON.encode Down)
-            join (asks Egg.getEvents)
+            Egg.getEvents
       fst val `shouldBe` Map.fromList [(1, JSON.toJSON Up), (2, JSON.toJSON Down)]
     it "Runs a projection" $ do
       let val = runTestEggM' (InternalTestState 0 [] $ EventStore.def testProjection) $ do
@@ -50,7 +50,7 @@ main = hspec $ do
             writeEvent (toStrict $ JSON.encode Up)
             writeEvent (toStrict $ JSON.encode Down)
             writeEvent (toStrict $ JSON.encode Up)
-            events <- join (asks Egg.getEvents)
+            events <- Egg.getEvents
             runProjection' <- asks Egg.runProjection
             runProjection' events
       -- whats the answer?
@@ -61,13 +61,12 @@ main = hspec $ do
       let val = runTestEggM' (InternalTestState 0 [] $ EventStore.def testProjection) $ do
             writeEvent <- asks Egg.writeEvent
             runProjection' <- asks Egg.runProjection
-            getEvents <- asks Egg.getEvents
             writeEvent (toStrict $ JSON.encode Up)
-            _ <- getEvents >>= runProjection'
+            _ <- Egg.getEvents >>= runProjection'
             writeEvent (toStrict $ JSON.encode Down)
-            _ <- getEvents >>= runProjection'
+            _ <- Egg.getEvents >>= runProjection'
             writeEvent (toStrict $ JSON.encode Up)
-            getEvents >>= runProjection'
+            Egg.getEvents >>= runProjection'
       -- whats the answer?
       fst val `shouldBe` 1
       -- whats the next key?
@@ -119,6 +118,10 @@ newtype TestEggM state t
       MonadState (InternalTestState Int)
     )
 
+instance Egg.GetEvents (TestEggM state) where
+  getEvents =
+    Map.fromList <$> zip [(1 :: Int) ..] <$> iAllEvents <$> get
+
 maxKey :: EventStore.EventList -> Int
 maxKey as = Map.foldrWithKey (\k _ k' -> max k k') 0 as
 
@@ -134,8 +137,6 @@ stateConfig =
                 Just action -> (InternalTestState i (es <> [action]) s)
                 Nothing -> InternalTestState i es s
           ),
-      Egg.getEvents =
-        Map.fromList <$> zip [(1 :: Int) ..] <$> iAllEvents <$> get,
       Egg.runAPI = \_tx -> pure Nothing,
       Egg.runProjection = \events -> do
         (InternalTestState startAt es oldState) <- get

@@ -8,7 +8,6 @@
 import Control.Monad.Reader
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Char8 as BS8
-import qualified Data.Map as Map
 import qualified Data.Text as Tx
 import qualified Database.PostgreSQL.Simple as SQL
 import qualified Egg.API as API
@@ -48,6 +47,7 @@ requestHandler ::
   ( JSON.FromJSON action,
     Show state,
     MonadIO m,
+    Egg.GetEvents m,
     MonadReader (Egg.EggConfig m action state) m
   ) =>
   Wai.Request ->
@@ -75,13 +75,14 @@ handlePostRequest jsonStr = do
 
 handleGetRequest ::
   ( JSON.FromJSON action,
+    Egg.GetEvents m,
     MonadReader (Egg.EggConfig m action state) m
   ) =>
   [Tx.Text] ->
   m Wai.Response
 handleGetRequest args = do
   -- lets assume this is get and try and access the API
-  newEvents <- join (asks Egg.getEvents)
+  newEvents <- Egg.getEvents
   _ <- asks Egg.runProjection >>= (\f -> f newEvents)
   response <- asks Egg.runAPI >>= (\a -> a args)
   case response of
