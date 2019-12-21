@@ -2,19 +2,11 @@
 
 module Egg.EventStore where
 
-import Control.Concurrent
-  ( MVar,
-    modifyMVar,
-    newMVar,
-    readMVar,
-  )
+import Control.Concurrent (MVar, modifyMVar, newMVar, readMVar)
+import Control.Monad.IO.Class
 import qualified Data.Aeson as JSON
 import qualified Data.Map as M
-import Data.Maybe
-  ( catMaybes,
-    fromMaybe,
-    listToMaybe,
-  )
+import Data.Maybe (catMaybes, fromMaybe, listToMaybe)
 import Data.Text (Text)
 
 type EventList = M.Map Int JSON.Value
@@ -35,10 +27,11 @@ data StatefulProjection action state
 
 -- create a projection with the empty default value
 createMVar ::
+  MonadIO m =>
   Projection action state ->
-  IO (StatefulProjection action state)
+  m (StatefulProjection action state)
 createMVar projection' = do
-  mvar <- newMVar (0, (def projection'))
+  mvar <- liftIO $ newMVar (0, (def projection'))
   pure $
     StatefulProjection
       { projection = projection',
@@ -46,23 +39,30 @@ createMVar projection' = do
       }
 
 readProjection ::
+  (MonadIO m) =>
   StatefulProjection a state ->
-  IO state
+  m state
 readProjection (StatefulProjection _ value') =
-  snd <$> readMVar value'
+  snd <$> (liftIO $ readMVar value')
+
+getMostRecentIndex ::
+  MonadIO m => StatefulProjection a s -> m Int
+getMostRecentIndex (StatefulProjection _ value') =
+  fst <$> (liftIO $ readMVar value')
 
 runStatefulProjection ::
-  (JSON.FromJSON action) =>
+  (MonadIO m, JSON.FromJSON action) =>
   StatefulProjection action state ->
   EventList ->
-  IO state
+  m state
 runStatefulProjection (StatefulProjection projection' value') events =
-  modifyMVar
-    value'
-    ( \(startKey, oldState) -> do
-        let newState = runProjection events startKey oldState projection'
-        pure (newState, (snd newState))
-    )
+  liftIO $
+    modifyMVar
+      value'
+      ( \(startKey, oldState) -> do
+          let newState = runProjection events startKey oldState projection'
+          pure (newState, (snd newState))
+      )
 
 -- run all events
 runProjection ::
