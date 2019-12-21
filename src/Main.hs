@@ -48,6 +48,7 @@ requestHandler ::
     Show state,
     MonadIO m,
     Egg.GetEvents m,
+    Egg.WriteEvent m,
     MonadReader (Egg.EggConfig m action state) m
   ) =>
   Wai.Request ->
@@ -59,15 +60,13 @@ requestHandler request =
 
 -- post means plop an event in the store
 handlePostRequest ::
-  ( JSON.FromJSON action,
-    Show state,
-    MonadReader (Egg.EggConfig m action state) m
+  ( Egg.WriteEvent m
   ) =>
   BS8.ByteString ->
   m Wai.Response
 handlePostRequest jsonStr = do
   -- write the event
-  _ <- asks Egg.writeEvent >>= (\f -> f jsonStr)
+  Egg.writeEvent jsonStr
   let status = HTTP.status200
   let headers = []
   let body = "Saved!"
