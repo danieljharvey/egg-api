@@ -1,7 +1,9 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -48,26 +50,28 @@ main = hspec $ do
             Egg.writeEvent (toStrict $ JSON.encode Up)
             Egg.writeEvent (toStrict $ JSON.encode Down)
             Egg.writeEvent (toStrict $ JSON.encode Up)
-            events <- Egg.getEvents
-            runProjection' <- asks Egg.runProjection
-            runProjection' events
+            projection' <- asks Egg.projection
+            Egg.runProjection projection'
       -- whats the answer?
-      fst val `shouldBe` 1
+      (snd . fst) val `shouldBe` 1
       -- whats the next key?
       (iLastKeyUsed <$> snd) val `shouldBe` 4
     it "Runs a projection in parts gives same result" $ do
       let val = runTestEggM' (InternalTestState 0 [] $ EventStore.def testProjection) $ do
-            runProjection' <- asks Egg.runProjection
+            projection' <- asks Egg.projection
             Egg.writeEvent (toStrict $ JSON.encode Up)
-            _ <- Egg.getEvents >>= runProjection'
+            _ <- Egg.runProjection projection'
             Egg.writeEvent (toStrict $ JSON.encode Down)
-            _ <- Egg.getEvents >>= runProjection'
+            _ <- Egg.runProjection projection'
             Egg.writeEvent (toStrict $ JSON.encode Up)
-            Egg.getEvents >>= runProjection'
+            Egg.runProjection projection'
       -- whats the answer?
-      fst val `shouldBe` 1
+      (snd . fst) val
+        `shouldBe` 1
       -- whats the next key?
-      (iLastKeyUsed <$> snd) val `shouldBe` 4
+      (iLastKeyUsed <$> snd)
+        val
+        `shouldBe` 4
 
 data TestAction
   = Up
@@ -75,7 +79,7 @@ data TestAction
   | Reset
   deriving (Eq, Ord, Show, Generic, JSON.FromJSON, JSON.ToJSON)
 
-testProjection :: EventStore.Projection TestAction Int
+testProjection :: EventStore.Projection TestAction Integer
 testProjection =
   EventStore.Projection
     { EventStore.title = "Test Projection",
@@ -88,12 +92,15 @@ testProjection =
 
 data InternalTestState s
   = InternalTestState
-      { iLastKeyUsed :: Int,
+      { iLastKeyUsed :: Integer,
         iAllEvents :: [JSON.Value],
         iState :: s
       }
 
-runTestEggM' :: InternalTestState Int -> TestEggM Int a -> (a, InternalTestState Int)
+runTestEggM' ::
+  InternalTestState Integer ->
+  TestEggM Integer a ->
+  (a, InternalTestState Integer)
 runTestEggM' as val = do
   runState state' as
   where
@@ -104,7 +111,7 @@ newtype TestEggM state t
   = TestEggM
       { runTestEggM ::
           ReaderT (Egg.EggConfig (TestEggM state) TestAction state)
-            (State (InternalTestState Int))
+            (State (InternalTestState Integer))
             t
       }
   deriving newtype
@@ -112,12 +119,12 @@ newtype TestEggM state t
       Applicative,
       Monad,
       MonadReader (Egg.EggConfig (TestEggM state) TestAction state),
-      MonadState (InternalTestState Int)
+      MonadState (InternalTestState Integer)
     )
 
 instance Egg.GetEvents (TestEggM state) where
   getEvents =
-    Map.fromList <$> zip [(1 :: Int) ..] <$> iAllEvents <$> get
+    Map.fromList <$> zip [(1 :: Integer) ..] <$> iAllEvents <$> get
 
 instance Egg.WriteEvent (TestEggM state) where
   writeEvent bs =
@@ -128,19 +135,34 @@ instance Egg.WriteEvent (TestEggM state) where
             Nothing -> InternalTestState i es s
       )
 
-maxKey :: EventStore.EventList -> Int
+instance Egg.CacheState Integer (TestEggM state) where
+
+  putState lastIndex newState = do
+    (InternalTestState _ es _) <- get
+    put (InternalTestState lastIndex es newState)
+
+  getState = do
+    (InternalTestState lastIndex _ state') <- get
+    pure (lastIndex, state')
+
+instance Egg.RunProjection TestAction Integer (TestEggM Integer) where
+  runProjection projection' = do
+    events' <- Egg.getEvents
+    (index, state') <- Egg.getState
+    let (newIndex, newState) = EventStore.runProjection events' index state' projection'
+    Egg.putState newIndex newState
+    pure (newIndex, newState)
+
+maxKey :: EventStore.EventList -> Integer
 maxKey as = Map.foldrWithKey (\k _ k' -> max k k') 0 as
 
 stateConfig ::
-  Egg.EggConfig (TestEggM state) TestAction Int
+  Egg.EggConfig (TestEggM state) TestAction Integer
 stateConfig =
   Egg.EggConfig
     { Egg.dbConnection = undefined,
-      Egg.runAPI = \_tx -> pure Nothing,
-      Egg.runProjection = \events -> do
-        (InternalTestState startAt es oldState) <- get
-        let (lastKeyUsed, newState) = EventStore.runProjection events startAt oldState testProjection
-        put (InternalTestState lastKeyUsed es newState)
-        pure newState,
+      Egg.api = undefined,
+      Egg.projection = testProjection,
+      Egg.cachedState = undefined,
       Egg.getMostRecentIndex = iLastKeyUsed <$> get
     }

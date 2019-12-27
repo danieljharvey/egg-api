@@ -5,6 +5,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+import Control.Concurrent (newMVar)
 import Control.Monad.Reader
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Char8 as BS8
@@ -21,7 +22,7 @@ import qualified Network.Wai.Handler.Warp as Warp
 import qualified System.Envy as Envy
 
 type EventRow =
-  (Int, JSON.Value)
+  (Integer, JSON.Value)
 
 main :: IO ()
 main = do
@@ -33,7 +34,8 @@ main = do
       connection <- SQL.connectPostgreSQL (DB.configDatabase config)
       DB.createSchema connection
       projections' <- EventStore.createMVar Sample.eggBoardProjection
-      let eggConfig = Egg.makeConfig connection projections' API.sampleAPI
+      mVar <- newMVar (0, EventStore.def Sample.eggBoardProjection)
+      let eggConfig = Egg.makeConfig connection Sample.eggBoardProjection projections' API.sampleAPI mVar
       Warp.runSettings settings (application eggConfig)
 
 application ::
@@ -48,6 +50,8 @@ requestHandler ::
     Show state,
     MonadIO m,
     Egg.GetEvents m,
+    Egg.RunAPI action state m,
+    Egg.RunProjection action state m,
     Egg.WriteEvent m,
     MonadReader (Egg.EggConfig m action state) m
   ) =>
@@ -75,15 +79,17 @@ handlePostRequest jsonStr = do
 handleGetRequest ::
   ( JSON.FromJSON action,
     Egg.GetEvents m,
+    Egg.RunProjection action state m,
+    Egg.RunAPI action state m,
     MonadReader (Egg.EggConfig m action state) m
   ) =>
   [Tx.Text] ->
   m Wai.Response
 handleGetRequest args = do
   -- lets assume this is get and try and access the API
-  newEvents <- Egg.getEvents
-  _ <- asks Egg.runProjection >>= (\f -> f newEvents)
-  response <- asks Egg.runAPI >>= (\a -> a args)
+  projection' <- asks Egg.projection
+  _ <- Egg.runProjection projection'
+  response <- Egg.runAPIRequest args
   case response of
     Just a -> pure (Wai.responseLBS HTTP.status400 [] (JSON.encode a))
     Nothing ->

@@ -9,7 +9,7 @@ import qualified Data.Map as M
 import Data.Maybe (catMaybes, fromMaybe, listToMaybe)
 import Data.Text (Text)
 
-type EventList = M.Map Int JSON.Value
+type EventList = M.Map Integer JSON.Value
 
 -- basic Projection
 data Projection action state
@@ -22,7 +22,7 @@ data Projection action state
 data StatefulProjection action state
   = StatefulProjection
       { projection :: Projection action state,
-        value :: MVar (Int, state)
+        value :: MVar (Integer, state)
       }
 
 -- create a projection with the empty default value
@@ -46,7 +46,7 @@ readProjection (StatefulProjection _ value') =
   snd <$> (liftIO $ readMVar value')
 
 getMostRecentIndex ::
-  MonadIO m => StatefulProjection a s -> m Int
+  MonadIO m => StatefulProjection a s -> m Integer
 getMostRecentIndex (StatefulProjection _ value') =
   fst <$> (liftIO $ readMVar value')
 
@@ -55,23 +55,26 @@ runStatefulProjection ::
   StatefulProjection action state ->
   EventList ->
   m state
-runStatefulProjection (StatefulProjection projection' value') events =
+runStatefulProjection proj@(StatefulProjection projection' _) events =
+  modifyState proj (\(i, s) -> runProjection events i s projection')
+
+modifyState ::
+  (MonadIO m) =>
+  StatefulProjection action state ->
+  ((Integer, state) -> (Integer, state)) ->
+  m state
+modifyState (StatefulProjection _ value') f =
   liftIO $
-    modifyMVar
-      value'
-      ( \(startKey, oldState) -> do
-          let newState = runProjection events startKey oldState projection'
-          pure (newState, (snd newState))
-      )
+    modifyMVar value' (\s -> pure (f s, snd (f s)))
 
 -- run all events
 runProjection ::
   (JSON.FromJSON action) =>
   EventList ->
-  Int ->
+  Integer ->
   state ->
   Projection action state ->
-  (Int, state)
+  (Integer, state)
 runProjection events startKey oldState projection' =
   ((nextKey events), newState)
   where
@@ -91,7 +94,7 @@ resultToMaybe a =
     JSON.Success a' -> Just a'
     _ -> Nothing
 
-nextKey :: EventList -> Int
+nextKey :: EventList -> Integer
 nextKey =
   (+ 1)
     . (fromMaybe 0)

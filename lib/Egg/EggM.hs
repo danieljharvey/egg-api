@@ -2,11 +2,17 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Egg.EggM where
 
+import Control.Concurrent (MVar, modifyMVar_, takeMVar)
 import Control.Monad.Reader
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Char8 as BS8
@@ -18,15 +24,15 @@ import qualified Egg.API as API
 import qualified Egg.EventStore as EventStore
 
 type EventRow a =
-  (Int, a)
+  (Integer, a)
 
 data EggConfig m action state
   = EggConfig
       { dbConnection :: SQL.Connection,
-        -- writeEvent :: BS8.ByteString -> m (),
-        runAPI :: [Tx.Text] -> m (Maybe JSON.Value),
-        runProjection :: EventStore.EventList -> m state,
-        getMostRecentIndex :: m Int
+        api :: API.API state,
+        projection :: EventStore.Projection action state,
+        getMostRecentIndex :: m Integer,
+        cachedState :: MVar (EventRow state)
       }
 
 class (Monad m) => GetEvents m where
@@ -35,19 +41,39 @@ class (Monad m) => GetEvents m where
 class (Monad m) => WriteEvent m where
   writeEvent :: BS8.ByteString -> m ()
 
+class
+  ( MonadReader (EggConfig m action state) m,
+    Monad m
+  ) =>
+  RunAPI action state m where
+  runAPIRequest :: [Tx.Text] -> m (Maybe JSON.Value)
+
+class CacheState state m where
+
+  putState :: Integer -> state -> m ()
+
+  getState :: m (Integer, state)
+
+class RunProjection action state m where
+  runProjection ::
+    EventStore.Projection action state ->
+    m (Integer, state)
+
 makeConfig ::
   JSON.FromJSON action =>
   SQL.Connection ->
+  EventStore.Projection action state ->
   EventStore.StatefulProjection action state ->
   API.API state ->
+  MVar (EventRow state) ->
   EggConfig (EggM action state) action state
-makeConfig c p api' =
+makeConfig c p sp api' mVar =
   EggConfig
     { dbConnection = c,
-      -- writeEvent = writeEvent',
-      runAPI = API.runAPI p api',
-      runProjection = EventStore.runStatefulProjection p,
-      getMostRecentIndex = EventStore.getMostRecentIndex p
+      api = api',
+      projection = p,
+      getMostRecentIndex = EventStore.getMostRecentIndex sp,
+      cachedState = mVar
     }
 
 newtype EggM action state t
@@ -65,6 +91,33 @@ instance GetEvents (EggM action state) where
 
 instance WriteEvent (EggM action state) where
   writeEvent = writeEvent'
+
+instance RunAPI action state (EggM action state) where
+  runAPIRequest as = do
+    (_, state') <- getState
+    api' <- asks api
+    pure $ api' state' as
+
+instance CacheState state (EggM action state) where
+
+  putState index state = do
+    cachedState' <- asks cachedState
+    liftIO $ modifyMVar_ cachedState' (\_ -> pure (index, state))
+
+  getState = do
+    cachedState' <- asks cachedState
+    liftIO $ takeMVar cachedState'
+
+instance
+  (JSON.FromJSON action) =>
+  RunProjection action state (EggM action state)
+  where
+  runProjection projection' = do
+    (index, state') <- getState @state
+    events' <- getEvents
+    let (newIndex, newState) = EventStore.runProjection events' index state' projection'
+    putState newIndex newState
+    pure (newIndex, newState)
 
 dbExecute ::
   (SQL.ToRow q) =>
@@ -88,7 +141,7 @@ getEvents' = do
   rows <- dbQuery "SELECT * FROM EVENTS where ID >= ?" [lastIndex]
   pure $ Map.fromList $ catMaybes (parseReply <$> rows)
 
-parseReply :: JSON.FromJSON a => (Int, JSON.Value) -> Maybe (Int, a)
+parseReply :: JSON.FromJSON a => (Integer, JSON.Value) -> Maybe (Integer, a)
 parseReply (i, json) =
   case JSON.fromJSON json of
     JSON.Success a' -> Just (i, a')
