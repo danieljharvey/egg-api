@@ -33,14 +33,13 @@ main = do
       let settings = DB.makeSettings config
       connection <- SQL.connectPostgreSQL (DB.configDatabase config)
       DB.createSchema connection
-      projections' <- EventStore.createMVar Sample.eggBoardProjection
       mVar <- newMVar (0, EventStore.def Sample.eggBoardProjection)
-      let eggConfig = Egg.makeConfig connection Sample.eggBoardProjection projections' API.sampleAPI mVar
+      let eggConfig = Egg.makeConfig connection Sample.eggBoardProjection API.sampleAPI mVar
       Warp.runSettings settings (application eggConfig)
 
 application ::
   (JSON.FromJSON action, Show state) =>
-  Egg.EggConfig (Egg.EggM action state) action state ->
+  Egg.EggConfig action state ->
   Wai.Application
 application config request respond =
   runReaderT (Egg.runEggM (requestHandler request)) config >>= respond
@@ -50,10 +49,9 @@ requestHandler ::
     Show state,
     MonadIO m,
     Egg.GetEvents m,
-    Egg.RunAPI action state m,
-    Egg.RunProjection action state m,
+    Egg.CacheState state m,
     Egg.WriteEvent m,
-    MonadReader (Egg.EggConfig m action state) m
+    MonadReader (Egg.EggConfig action state) m
   ) =>
   Wai.Request ->
   m Wai.Response
@@ -79,9 +77,8 @@ handlePostRequest jsonStr = do
 handleGetRequest ::
   ( JSON.FromJSON action,
     Egg.GetEvents m,
-    Egg.RunProjection action state m,
-    Egg.RunAPI action state m,
-    MonadReader (Egg.EggConfig m action state) m
+    Egg.CacheState state m,
+    MonadReader (Egg.EggConfig action state) m
   ) =>
   [Tx.Text] ->
   m Wai.Response

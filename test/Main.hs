@@ -6,6 +6,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Main where
 
@@ -32,9 +33,8 @@ main = hspec $ do
       \x -> fst (runTestEggM' (InternalTestState 0 [] $ EventStore.def testProjection) (pure x)) == (x :: String)
     it "Last projection value is passed through" $ do
       let val =
-            runTestEggM' (InternalTestState 10 [] $ EventStore.def testProjection)
-              $ join
-              $ asks Egg.getMostRecentIndex
+            runTestEggM' (InternalTestState 10 [] $ EventStore.def testProjection) $
+              fst <$> Egg.getState @Integer
       fst val `shouldBe` 10
     it "Passes through events" $ do
       let val = runTestEggM' (InternalTestState 0 [JSON.toJSON Reset] $ EventStore.def testProjection) $ Egg.getEvents
@@ -110,7 +110,7 @@ runTestEggM' as val = do
 newtype TestEggM state t
   = TestEggM
       { runTestEggM ::
-          ReaderT (Egg.EggConfig (TestEggM state) TestAction state)
+          ReaderT (Egg.EggConfig TestAction state)
             (State (InternalTestState Integer))
             t
       }
@@ -118,7 +118,7 @@ newtype TestEggM state t
     ( Functor,
       Applicative,
       Monad,
-      MonadReader (Egg.EggConfig (TestEggM state) TestAction state),
+      MonadReader (Egg.EggConfig TestAction state),
       MonadState (InternalTestState Integer)
     )
 
@@ -145,24 +145,15 @@ instance Egg.CacheState Integer (TestEggM state) where
     (InternalTestState lastIndex _ state') <- get
     pure (lastIndex, state')
 
-instance Egg.RunProjection TestAction Integer (TestEggM Integer) where
-  runProjection projection' = do
-    events' <- Egg.getEvents
-    (index, state') <- Egg.getState
-    let (newIndex, newState) = EventStore.runProjection events' index state' projection'
-    Egg.putState newIndex newState
-    pure (newIndex, newState)
-
 maxKey :: EventStore.EventList -> Integer
 maxKey as = Map.foldrWithKey (\k _ k' -> max k k') 0 as
 
 stateConfig ::
-  Egg.EggConfig (TestEggM state) TestAction Integer
+  Egg.EggConfig TestAction Integer
 stateConfig =
   Egg.EggConfig
     { Egg.dbConnection = undefined,
       Egg.api = undefined,
       Egg.projection = testProjection,
-      Egg.cachedState = undefined,
-      Egg.getMostRecentIndex = iLastKeyUsed <$> get
+      Egg.cachedState = undefined
     }
