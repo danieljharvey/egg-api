@@ -10,6 +10,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Read as T
 import Egg.EventTypes
 import qualified Egg.SampleProjections as Sample
+import Egg.Types.Internal
 import GHC.Generics
 
 -- types for our API
@@ -17,9 +18,6 @@ import GHC.Generics
 -- let's not get too clever
 -- we take the state and a request string
 -- and maybe return something good
-
-type API state =
-  state -> [T.Text] -> Maybe JSON.Value
 
 data Reply
   = Reply {items :: [T.Text]}
