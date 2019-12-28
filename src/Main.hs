@@ -8,20 +8,18 @@
 import Control.Monad.Reader
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Char8 as BS8
+import Data.IORef
 import qualified Data.Text as Tx
 import qualified Database.PostgreSQL.Simple as SQL
 import qualified Egg.API as API
 import qualified Egg.DB as DB
 import qualified Egg.EggM as Egg
-import qualified Egg.EventStore as EventStore
 import qualified Egg.SampleProjections as Sample
+import Egg.Types.Internal
 import qualified Network.HTTP.Types as HTTP
 import qualified Network.Wai as Wai
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified System.Envy as Envy
-
-type EventRow =
-  (Int, JSON.Value)
 
 main :: IO ()
 main = do
@@ -32,13 +30,17 @@ main = do
       let settings = DB.makeSettings config
       connection <- SQL.connectPostgreSQL (DB.configDatabase config)
       DB.createSchema connection
-      projections' <- EventStore.createMVar Sample.eggBoardProjection
-      let eggConfig = Egg.makeConfig connection projections' API.sampleAPI
+      ioRef <-
+        newIORef
+          ( (NextRow 0),
+            def Sample.eggBoardProjection
+          )
+      let eggConfig = Egg.makeConfig connection Sample.eggBoardProjection API.sampleAPI ioRef
       Warp.runSettings settings (application eggConfig)
 
 application ::
   (JSON.FromJSON action, Show state) =>
-  Egg.EggConfig (Egg.EggM action state) action state ->
+  Egg.EggConfig action state ->
   Wai.Application
 application config request respond =
   runReaderT (Egg.runEggM (requestHandler request)) config >>= respond
@@ -47,9 +49,10 @@ requestHandler ::
   ( JSON.FromJSON action,
     Show state,
     MonadIO m,
-    Egg.GetEvents m,
-    Egg.WriteEvent m,
-    MonadReader (Egg.EggConfig m action state) m
+    GetEvents m,
+    CacheState state m,
+    WriteEvent m,
+    MonadReader (Egg.EggConfig action state) m
   ) =>
   Wai.Request ->
   m Wai.Response
@@ -60,13 +63,13 @@ requestHandler request =
 
 -- post means plop an event in the store
 handlePostRequest ::
-  ( Egg.WriteEvent m
+  ( WriteEvent m
   ) =>
   BS8.ByteString ->
   m Wai.Response
 handlePostRequest jsonStr = do
   -- write the event
-  Egg.writeEvent jsonStr
+  writeEvent jsonStr
   let status = HTTP.status200
   let headers = []
   let body = "Saved!"
@@ -74,16 +77,17 @@ handlePostRequest jsonStr = do
 
 handleGetRequest ::
   ( JSON.FromJSON action,
-    Egg.GetEvents m,
-    MonadReader (Egg.EggConfig m action state) m
+    GetEvents m,
+    CacheState state m,
+    MonadReader (Egg.EggConfig action state) m
   ) =>
   [Tx.Text] ->
   m Wai.Response
 handleGetRequest args = do
   -- lets assume this is get and try and access the API
-  newEvents <- Egg.getEvents
-  _ <- asks Egg.runProjection >>= (\f -> f newEvents)
-  response <- asks Egg.runAPI >>= (\a -> a args)
+  projection' <- asks Egg.projection
+  api' <- asks Egg.api
+  response <- runAPIRequest projection' api' args
   case response of
     Just a -> pure (Wai.responseLBS HTTP.status400 [] (JSON.encode a))
     Nothing ->

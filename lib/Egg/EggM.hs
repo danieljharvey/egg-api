@@ -2,69 +2,77 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Egg.EggM where
 
 import Control.Monad.Reader
 import qualified Data.Aeson as JSON
-import qualified Data.ByteString.Char8 as BS8
+import Data.IORef
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
-import qualified Data.Text as Tx
 import qualified Database.PostgreSQL.Simple as SQL
-import qualified Egg.API as API
-import qualified Egg.EventStore as EventStore
+import Egg.Types.Instances ()
+import Egg.Types.Internal
 
-type EventRow a =
-  (Int, a)
-
-data EggConfig m action state
+data EggConfig action state
   = EggConfig
       { dbConnection :: SQL.Connection,
-        -- writeEvent :: BS8.ByteString -> m (),
-        runAPI :: [Tx.Text] -> m (Maybe JSON.Value),
-        runProjection :: EventStore.EventList -> m state,
-        getMostRecentIndex :: m Int
+        api :: API state,
+        projection :: Projection action state,
+        cachedState :: IORef (NextRow, state)
       }
-
-class (Monad m) => GetEvents m where
-  getEvents :: m EventStore.EventList
-
-class (Monad m) => WriteEvent m where
-  writeEvent :: BS8.ByteString -> m ()
 
 makeConfig ::
   JSON.FromJSON action =>
   SQL.Connection ->
-  EventStore.StatefulProjection action state ->
-  API.API state ->
-  EggConfig (EggM action state) action state
-makeConfig c p api' =
+  Projection action state ->
+  API state ->
+  IORef (NextRow, state) ->
+  EggConfig action state
+makeConfig c p api' ioRef =
   EggConfig
     { dbConnection = c,
-      -- writeEvent = writeEvent',
-      runAPI = API.runAPI p api',
-      runProjection = EventStore.runStatefulProjection p,
-      getMostRecentIndex = EventStore.getMostRecentIndex p
+      api = api',
+      projection = p,
+      cachedState = ioRef
     }
 
 newtype EggM action state t
-  = EggM {runEggM :: ReaderT (EggConfig (EggM action state) action state) IO t}
+  = EggM {runEggM :: ReaderT (EggConfig action state) IO t}
   deriving newtype
     ( Functor,
       Applicative,
       Monad,
       MonadIO,
-      MonadReader (EggConfig (EggM action state) action state)
+      MonadReader (EggConfig action state)
     )
 
 instance GetEvents (EggM action state) where
-  getEvents = getEvents'
+  getEvents (NextRow lastIndex) = do
+    rows <- dbQuery "SELECT * FROM EVENTS where ID >= ?" [lastIndex]
+    pure $ Map.fromList $ catMaybes (parseReply <$> rows)
 
 instance WriteEvent (EggM action state) where
-  writeEvent = writeEvent'
+  writeEvent json =
+    dbExecute "INSERT INTO events (info) VALUES (?);" [json]
+
+instance CacheState state (EggM action state) where
+
+  putState index state = do
+    cachedState' <- asks cachedState
+    liftIO $ writeIORef cachedState' (index, state)
+
+  getState = do
+    cachedState' <- asks cachedState
+    liftIO $ readIORef cachedState'
 
 dbExecute ::
   (SQL.ToRow q) =>
@@ -81,22 +89,11 @@ dbQuery query args = do
   connection' <- asks dbConnection
   liftIO $ SQL.query connection' query args
 
--- get the relevant events
-getEvents' :: EggM a s EventStore.EventList
-getEvents' = do
-  lastIndex <- join (asks getMostRecentIndex)
-  rows <- dbQuery "SELECT * FROM EVENTS where ID >= ?" [lastIndex]
-  pure $ Map.fromList $ catMaybes (parseReply <$> rows)
-
-parseReply :: JSON.FromJSON a => (Int, JSON.Value) -> Maybe (Int, a)
+parseReply ::
+  JSON.FromJSON a =>
+  (Int, JSON.Value) ->
+  Maybe (EventId, a)
 parseReply (i, json) =
   case JSON.fromJSON json of
-    JSON.Success a' -> Just (i, a')
+    JSON.Success a' -> Just (EventId i, a')
     _ -> Nothing
-
--- write an event to the store
-writeEvent' ::
-  BS8.ByteString ->
-  EggM a s ()
-writeEvent' json =
-  dbExecute "INSERT INTO events (info) VALUES (?);" [json]

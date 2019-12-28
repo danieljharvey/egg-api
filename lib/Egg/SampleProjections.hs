@@ -1,20 +1,21 @@
-{-# LANGUAGE DeriveAnyClass      #-}
-{-# LANGUAGE DeriveGeneric       #-}
-{-# LANGUAGE FlexibleInstances   #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Egg.SampleProjections where
 
-import qualified Data.Aeson                as JSON
-import qualified Data.Map                  as Map
-import           Data.Semigroup
-import           Egg.EventStore
-import           Egg.EventTypes
-import           GHC.Generics
-import           Test.QuickCheck.Arbitrary
+import qualified Data.Aeson as JSON
+import qualified Data.Map as Map
+import Data.Semigroup
+import Egg.EventTypes
+import Egg.Types.Internal
+import GHC.Generics
+import Test.QuickCheck.Arbitrary
 
 data Board
   = Board
@@ -40,22 +41,29 @@ blankBoard w h =
     item = TileId 0
 
 mapWithIndex :: (Int -> a -> b) -> [a] -> [b]
-mapWithIndex f as
-  = (\(i,a') -> f i a') <$> as'
+mapWithIndex f as =
+  (\(i, a') -> f i a') <$> as'
   where
-    as'
-      = zip [0..] as
+    as' =
+      zip [0 ..] as
 
 setElem :: Int -> Int -> a -> [[a]] -> [[a]]
-setElem ax ay item old
-  = mapWithIndex (\x' row -> if ax == x'
-                             then changeRow row
-                             else row) old
+setElem ax ay item old =
+  mapWithIndex
+    ( \x' row ->
+        if ax == x'
+          then changeRow row
+          else row
+    )
+    old
   where
-    changeRow
-      = mapWithIndex (\y' item' -> if ay == y'
-                                   then item
-                                   else item')
+    changeRow =
+      mapWithIndex
+        ( \y' item' ->
+            if ay == y'
+              then item
+              else item'
+        )
 
 eggBoardProjection :: Projection BoardActions EggState
 eggBoardProjection =

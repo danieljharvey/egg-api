@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 55fb3d99ec8207d8a92cb74478edd12b7338696ff07184b928057e919fda3023
+-- hash: e9f7e53c6a13be693ad739e7449b728127a96ff420beccd987b819558ff99bbd
 
 name:           egg-api
 version:        1.0.0
@@ -18,6 +18,8 @@ library
       Egg.EventStore
       Egg.EventTypes
       Egg.SampleProjections
+      Egg.Types.Instances
+      Egg.Types.Internal
   other-modules:
       Paths_egg_api
   hs-source-dirs:
@@ -71,6 +73,8 @@ test-suite unit-tests
       Egg.EventStore
       Egg.EventTypes
       Egg.SampleProjections
+      Egg.Types.Instances
+      Egg.Types.Internal
       Paths_egg_api
   hs-source-dirs:
       test
