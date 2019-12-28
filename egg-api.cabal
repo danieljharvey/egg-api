@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e9f7e53c6a13be693ad739e7449b728127a96ff420beccd987b819558ff99bbd
+-- hash: 155e3feb273c495d96cabe8335d28cec4d4544c8e0abd78e400c44c3e81d9e5a
 
 name:           egg-api
 version:        1.0.0
@@ -67,6 +67,7 @@ test-suite unit-tests
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      TestEggM
       Egg.API
       Egg.DB
       Egg.EggM
