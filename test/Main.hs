@@ -10,24 +10,22 @@
 
 module Main where
 
-import Control.Monad.State
 import qualified Data.Aeson as JSON
-import Data.ByteString.Lazy (fromStrict, toStrict)
+import Data.ByteString.Lazy (toStrict)
 import qualified Data.Map as Map
-import Data.Semigroup
 import qualified Egg.SampleProjections as Sample
 import Egg.Types.Instances ()
 import Egg.Types.Internal
 import GHC.Generics
 import Test.Hspec
 import Test.QuickCheck
+import TestEggM
 
 emptyState :: InternalTestState Integer
 emptyState =
   InternalTestState
-    (NextRow 0)
     []
-    (def testProjection)
+    (NextRow 0, def testProjection)
 
 main :: IO ()
 main = hspec $ do
@@ -39,14 +37,17 @@ main = hspec $ do
       \x -> fst (runTestEggM' emptyState (pure x)) == (x :: String)
     it "Last projection value is passed through" $ do
       let val =
-            runTestEggM' (InternalTestState (NextRow 10) [] $ def testProjection) $
+            runTestEggM' (InternalTestState [] (NextRow 10, def testProjection)) $
               fst <$> getState @Integer
       fst val `shouldBe` (NextRow 10)
     it "Passes through events" $ do
       let val =
             runTestEggM'
-              ( InternalTestState (NextRow 0) [JSON.toJSON Reset] $
-                  def testProjection
+              ( InternalTestState
+                  [JSON.toJSON Reset]
+                  ( NextRow 0,
+                    def testProjection
+                  )
               )
               $ getEvents (NextRow 0)
       fst val `shouldBe` Map.fromList [((EventId 1), JSON.toJSON Reset)]
@@ -69,7 +70,7 @@ main = hspec $ do
       -- whats the answer?
       (snd . fst) val `shouldBe` 1
       -- whats the next key?
-      (iLastKeyUsed <$> snd) val `shouldBe` (NextRow 4)
+      (fst . fst) val `shouldBe` (NextRow 4)
     it "Runs a projection in parts gives same result" $ do
       let val = runTestEggM' emptyState $ do
             writeEvent (toStrict $ JSON.encode Up)
@@ -82,7 +83,7 @@ main = hspec $ do
       (snd . fst) val
         `shouldBe` 1
       -- whats the next key?
-      (iLastKeyUsed <$> snd)
+      (fst <$> fst)
         val
         `shouldBe` (NextRow 4)
     it "Receives nothing for a stupid API call" $ do
@@ -113,6 +114,8 @@ main = hspec $ do
             getState @(Integer)
       (fst index) `shouldBe` (NextRow 6)
 
+-- basic test data
+
 data TestAction
   = Up
   | Down
@@ -136,64 +139,6 @@ testProjection =
         Reset -> 0,
       def = 0
     }
-
-data InternalTestState s
-  = InternalTestState
-      { iLastKeyUsed :: NextRow,
-        iAllEvents :: [JSON.Value],
-        iState :: s
-      }
-
-runTestEggM' ::
-  InternalTestState Integer ->
-  TestEggM Integer a ->
-  (a, InternalTestState Integer)
-runTestEggM' as val = do
-  runState state' as
-  where
-    state' =
-      runTestEggM val
-
-newtype TestEggM state t
-  = TestEggM
-      { runTestEggM ::
-          State (InternalTestState Integer)
-            t
-      }
-  deriving newtype
-    ( Functor,
-      Applicative,
-      Monad,
-      MonadState (InternalTestState Integer)
-    )
-
--- todo, only fetch relevant events
-instance GetEvents (TestEggM state) where
-  getEvents from' =
-    Map.fromList
-      <$> filter (\(i, _) -> getEventId i > getNextRow from')
-      <$> zip (EventId <$> [(1 :: Int) ..])
-      <$> iAllEvents
-      <$> get
-
-instance WriteEvent (TestEggM state) where
-  writeEvent bs =
-    modify $
-      ( \(InternalTestState i es s) ->
-          case JSON.decode (fromStrict bs) of
-            Just action -> (InternalTestState i (es <> [action]) s)
-            Nothing -> InternalTestState i es s
-      )
-
-instance CacheState Integer (TestEggM state) where
-
-  putState lastIndex newState = do
-    (InternalTestState _ es _) <- get
-    put (InternalTestState lastIndex es newState)
-
-  getState = do
-    (InternalTestState lastIndex _ state') <- get
-    pure (lastIndex, state')
 
 testAPI :: API Integer
 testAPI state' as =
