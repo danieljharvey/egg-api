@@ -1,16 +1,17 @@
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE DeriveAnyClass             #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Egg.EventTypes where
 
-import           Control.Applicative
-import           Control.Monad
-import           Data.Aeson
-import           Test.QuickCheck.Arbitrary
+import Control.Applicative
+import Control.Monad
+import Data.Aeson
+import Test.QuickCheck.Arbitrary
+
 --
 
 newtype TileId
@@ -25,8 +26,8 @@ newtype BoardId
 
 data NewBoard
   = NewBoard
-      { width   :: Int,
-        height  :: Int,
+      { width :: Int,
+        height :: Int,
         boardId :: BoardId
       }
 
@@ -43,9 +44,9 @@ instance FromJSON NewBoard where
 
 data AddTile
   = AddTile
-      { x           :: Int,
-        y           :: Int,
-        tileId      :: TileId,
+      { x :: Int,
+        y :: Int,
+        tileId :: TileId,
         tileBoardId :: BoardId
       }
 

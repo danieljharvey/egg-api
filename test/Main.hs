@@ -13,9 +13,9 @@ module Main where
 import qualified Data.Aeson as JSON
 import Data.ByteString.Lazy (toStrict)
 import qualified Data.Map as Map
-import qualified Egg.SampleProjections as Sample
 import Egg.Types.Instances ()
 import Egg.Types.Internal
+import EggAPI.EggAPISpec
 import GHC.Generics
 import Test.Hspec
 import Test.QuickCheck
@@ -29,9 +29,7 @@ emptyState =
 
 main :: IO ()
 main = hspec $ do
-  describe "Roundtrip JSON" $ do
-    it "Encodes and decodes" $ property $
-      \x -> (JSON.fromJSON . JSON.toJSON) x == JSON.Success (x :: Sample.Board)
+  eggAPISpec
   describe "Testing the test application" $ do
     it "Our test monad returns a value through all that mess" $ property $
       \x -> fst (runTestEggM' emptyState (pure x)) == (x :: String)
