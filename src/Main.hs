@@ -89,6 +89,17 @@ handleGetRequest args = do
   api' <- asks Egg.api
   response <- runAPIRequest projection' api' args
   case response of
-    Just a -> pure (Wai.responseLBS HTTP.status400 [] (JSON.encode a))
+    Just a ->
+      pure
+        ( Wai.responseLBS
+            HTTP.status200
+            [(HTTP.hContentType, "application/json")]
+            (JSON.encode a)
+        )
     Nothing ->
-      pure (Wai.responseLBS HTTP.status400 [] "No response!")
+      pure
+        ( Wai.responseLBS
+            HTTP.status400
+            []
+            "No response!"
+        )
