@@ -59,6 +59,15 @@ main = hspec $ do
           [ ((EventId 1), JSON.toJSON Up),
             ((EventId 2), JSON.toJSON Down)
           ]
+    it "Gets zero events the second time" $ do
+      let val = runTestEggM' emptyState $ do
+            writeEvent (toStrict $ JSON.encode Up)
+            writeEvent (toStrict $ JSON.encode Down)
+            (i, _) <- runProjection testProjection -- this should do the event getting
+            getEvents i
+      fst val
+        `shouldBe` Map.fromList
+          []
     it "Runs a projection" $ do
       let val = runTestEggM' emptyState $ do
             writeEvent (toStrict $ JSON.encode Up)
@@ -111,6 +120,15 @@ main = hspec $ do
             _ <- runAPIRequest testProjection testAPI ["Horses"]
             getState @(Integer)
       (fst index) `shouldBe` (NextRow 6)
+    it "Repeated API calls return same answer" $ do
+      let (val, _) = runTestEggM' emptyState $ do
+            writeEvent (toStrict $ JSON.encode Up)
+            writeEvent (toStrict $ JSON.encode Up)
+            val1 <- runAPIRequest testProjection testAPI ["doubled"]
+            val2 <- runAPIRequest testProjection testAPI ["doubled"]
+            pure (val1, val2)
+      fst val `shouldBe` snd val
+      fst val `shouldBe` Just (JSON.Number 4.0)
 
 -- basic test data
 

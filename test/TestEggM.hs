@@ -45,7 +45,7 @@ newtype TestEggM state t
 instance GetEvents (TestEggM state) where
   getEvents from' =
     Map.fromList
-      <$> filter (\(i, _) -> getEventId i > getNextRow from')
+      <$> filter (\(i, _) -> getEventId i >= getNextRow from')
       <$> zip (EventId <$> [(1 :: Int) ..])
       <$> iAllEvents
       <$> get

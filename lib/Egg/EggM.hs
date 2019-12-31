@@ -56,8 +56,8 @@ newtype EggM action state t
     )
 
 instance GetEvents (EggM action state) where
-  getEvents (NextRow lastIndex) = do
-    rows <- dbQuery "SELECT * FROM EVENTS where ID >= ?" [lastIndex]
+  getEvents (NextRow nextRow) = do
+    rows <- dbQuery "SELECT * FROM EVENTS where ID >= ?" [nextRow]
     pure $ Map.fromList $ catMaybes (parseReply <$> rows)
 
 instance WriteEvent (EggM action state) where
