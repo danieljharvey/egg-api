@@ -10,6 +10,7 @@ executables:
       - base
       - envy
       - wai
+      - wai-cors
       - warp
       - http-types
       - postgresql-simple

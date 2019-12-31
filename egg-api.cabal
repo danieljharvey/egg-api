@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3ad5cd804572a81e9c866d44ebd95fcda67bff9771fefa34ebd5ae9e26866a6c
+-- hash: 2dc56af3df7a3d572c5dd3f00bb23fdbf1b0476d0fa5e7c286d769131fa4a358
 
 name:           egg-api
 version:        1.0.0
@@ -60,6 +60,7 @@ executable app
     , postgresql-simple
     , text
     , wai
+    , wai-cors
     , warp
   default-language: Haskell2010
 

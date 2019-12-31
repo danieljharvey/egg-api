@@ -19,6 +19,7 @@ import Egg.Types.Internal
 import qualified Network.HTTP.Types as HTTP
 import qualified Network.Wai as Wai
 import qualified Network.Wai.Handler.Warp as Warp
+import Network.Wai.Middleware.Cors
 import qualified System.Envy as Envy
 
 main :: IO ()
@@ -42,8 +43,12 @@ application ::
   (JSON.FromJSON action, Show state) =>
   Egg.EggConfig action state ->
   Wai.Application
-application config request respond =
-  runReaderT (Egg.runEggM (requestHandler request)) config >>= respond
+application config =
+  simpleCors $
+    ( \request respond ->
+        runReaderT (Egg.runEggM (requestHandler request)) config
+          >>= respond
+    )
 
 requestHandler ::
   ( JSON.FromJSON action,
