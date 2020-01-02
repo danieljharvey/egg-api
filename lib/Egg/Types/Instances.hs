@@ -32,8 +32,8 @@ instance
   RunProjection action state m
   where
   runProjection projection' = do
-    (index, state') <- getState @state
-    events' <- getEvents index
-    let (newIndex, newState) = EventStore.runProjection events' index state' projection'
+    (oldIndex, oldState) <- getState @state
+    events' <- getEvents oldIndex
+    let (newIndex, newState) = EventStore.runProjection events' oldIndex oldState projection'
     putState newIndex newState
     pure (newIndex, newState)

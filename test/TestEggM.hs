@@ -1,4 +1,5 @@
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
@@ -15,13 +16,13 @@ import Egg.Types.Internal
 data InternalTestState s
   = InternalTestState
       { iAllEvents :: [JSON.Value],
-        iState :: (NextRow, s)
+        iState :: (LastRow, s)
       }
 
 runTestEggM' ::
-  InternalTestState Integer ->
-  TestEggM Integer a ->
-  (a, InternalTestState Integer)
+  InternalTestState s ->
+  TestEggM s a ->
+  (a, InternalTestState s)
 runTestEggM' as val = do
   runState state' as
   where
@@ -31,21 +32,21 @@ runTestEggM' as val = do
 newtype TestEggM state t
   = TestEggM
       { runTestEggM ::
-          State (InternalTestState Integer)
+          State (InternalTestState state)
             t
       }
   deriving newtype
     ( Functor,
       Applicative,
       Monad,
-      MonadState (InternalTestState Integer)
+      MonadState (InternalTestState state)
     )
 
 -- todo, only fetch relevant events
 instance GetEvents (TestEggM state) where
   getEvents from' =
     Map.fromList
-      <$> filter (\(i, _) -> getEventId i >= getNextRow from')
+      <$> filter (\(i, _) -> getEventId i > getLastRow from')
       <$> zip (EventId <$> [(1 :: Int) ..])
       <$> iAllEvents
       <$> get
@@ -59,7 +60,7 @@ instance WriteEvent (TestEggM state) where
             Nothing -> InternalTestState es s
       )
 
-instance CacheState Integer (TestEggM state) where
+instance CacheState state (TestEggM state) where
 
   putState lastIndex newState = do
     (InternalTestState es _) <- get
@@ -68,3 +69,7 @@ instance CacheState Integer (TestEggM state) where
   getState = do
     (InternalTestState _ (lastIndex, state')) <- get
     pure (lastIndex, state')
+{-modifyState f = do
+  modify (\(InternalTestState es a) -> (InternalTestState es (f a)))
+  (InternalTestState _ (lastIndex, state')) <- get
+  pure (lastIndex, state')-}

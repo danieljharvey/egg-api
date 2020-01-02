@@ -4,29 +4,42 @@ module Egg.EventStore where
 
 import qualified Data.Aeson as JSON
 import qualified Data.Map as M
-import Data.Maybe (catMaybes, fromMaybe, listToMaybe)
+import Data.Maybe (fromMaybe, listToMaybe)
 import Egg.Types.Internal
+
+type ActionList action =
+  M.Map EventId action
 
 -- run all events
 runProjection ::
   (JSON.FromJSON action) =>
   EventList ->
-  NextRow ->
+  LastRow ->
   state ->
   Projection action state ->
-  (NextRow, state)
-runProjection events startKey oldState projection' =
-  ((nextKey events), newState)
+  (LastRow, state)
+runProjection =
+  runProjectionInternal . convertActions
+  where
+    convertActions =
+      M.mapMaybe
+        (resultToMaybe . JSON.fromJSON)
+
+runProjectionInternal ::
+  ActionList action ->
+  LastRow ->
+  state ->
+  Projection action state ->
+  (LastRow, state)
+runProjectionInternal actions startKey oldState projection' =
+  ((nextKey actions), newState)
   where
     newState =
-      foldr (reducer projection') oldState (usefulEvents events)
+      foldl (flip $ reducer projection') oldState (usefulEvents actions)
     filterOldEvents =
-      M.filterWithKey (\k _ -> getEventId k >= getNextRow startKey)
+      M.filterWithKey (\k _ -> getEventId k > getLastRow startKey)
     usefulEvents =
-      catMaybes
-        . (map (resultToMaybe . JSON.fromJSON))
-        . M.elems
-        . filterOldEvents
+      M.elems . filterOldEvents
 
 resultToMaybe :: JSON.Result a -> Maybe a
 resultToMaybe a =
@@ -34,10 +47,9 @@ resultToMaybe a =
     JSON.Success a' -> Just a'
     _ -> Nothing
 
-nextKey :: EventList -> NextRow
+nextKey :: M.Map EventId a -> LastRow
 nextKey =
-  NextRow
-    . (+ 1)
+  LastRow
     . getEventId
     . (fromMaybe (EventId 0))
     . listToMaybe

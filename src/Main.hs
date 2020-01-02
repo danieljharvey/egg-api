@@ -33,7 +33,7 @@ main = do
       DB.createSchema connection
       ioRef <-
         newIORef
-          ( (NextRow 0),
+          ( (LastRow 0),
             def Sample.eggBoardProjection
           )
       let eggConfig = Egg.makeConfig connection Sample.eggBoardProjection API.sampleAPI ioRef

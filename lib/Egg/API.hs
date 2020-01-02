@@ -26,6 +26,8 @@ data Reply
 sampleAPI :: API Sample.EggState
 sampleAPI state args =
   case args of
+    ["state"] -> Just . JSON.toJSON $ state
+    ["levels"] -> Just . JSON.toJSON $ getLevelList state
     ["levels", levelId] -> JSON.toJSON <$> getLevel state levelId
     ["get", "some", "eggs"] -> Just . JSON.toJSON . Reply $ ["here are the eggs"]
     ["get", "some", a] -> Just . JSON.toJSON . Reply $ ["here are your", a]
@@ -44,3 +46,7 @@ getLevel :: Sample.EggState -> T.Text -> Maybe Sample.Board
 getLevel state levelIdString =
   (textToInt levelIdString)
     >>= (\levelId -> Map.lookup (BoardId levelId) (Sample.boards state))
+
+getLevelList :: Sample.EggState -> [BoardId]
+getLevelList state =
+  Map.keys (Sample.boards state)

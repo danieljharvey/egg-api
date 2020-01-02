@@ -27,7 +27,7 @@ data EggConfig action state
       { dbConnection :: SQL.Connection,
         api :: API state,
         projection :: Projection action state,
-        cachedState :: IORef (NextRow, state)
+        cachedState :: IORef (LastRow, state)
       }
 
 makeConfig ::
@@ -35,7 +35,7 @@ makeConfig ::
   SQL.Connection ->
   Projection action state ->
   API state ->
-  IORef (NextRow, state) ->
+  IORef (LastRow, state) ->
   EggConfig action state
 makeConfig c p api' ioRef =
   EggConfig
@@ -56,8 +56,8 @@ newtype EggM action state t
     )
 
 instance GetEvents (EggM action state) where
-  getEvents (NextRow nextRow) = do
-    rows <- dbQuery "SELECT * FROM EVENTS where ID >= ?" [nextRow]
+  getEvents (LastRow lastRow) = do
+    rows <- dbQuery "SELECT * FROM EVENTS where ID > ? ORDER BY id ASC" [lastRow]
     pure $ Map.fromList $ catMaybes (parseReply <$> rows)
 
 instance WriteEvent (EggM action state) where
@@ -73,6 +73,11 @@ instance CacheState state (EggM action state) where
   getState = do
     cachedState' <- asks cachedState
     liftIO $ readIORef cachedState'
+
+{-modifyState f = do
+  cachedState' <- asks cachedState
+  liftIO $ modifyIORef cachedState' f
+  liftIO $ readIORef cachedState'-}
 
 dbExecute ::
   (SQL.ToRow q) =>
