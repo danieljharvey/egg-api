@@ -14,8 +14,8 @@ import qualified Data.Text as Tx
 
 -- Datatypes to build your own EventStore
 
-newtype NextRow
-  = NextRow {getNextRow :: Int}
+newtype LastRow
+  = LastRow {getLastRow :: Int}
   deriving (Eq, Ord, Show)
 
 newtype EventId
@@ -37,7 +37,7 @@ type API state =
 
 -- Grabs the list of events
 class (Monad m) => GetEvents m where
-  getEvents :: NextRow -> m EventList
+  getEvents :: LastRow -> m EventList
 
 -- Write a new event to the store
 class (Monad m) => WriteEvent m where
@@ -59,12 +59,14 @@ class
 -- cache and retrieve a snapshotted state
 class (Monad m) => CacheState state m where
 
-  putState :: NextRow -> state -> m ()
+  putState :: LastRow -> state -> m ()
 
-  getState :: m (NextRow, state)
+  getState :: m (LastRow, state)
+
+-- modifyState :: ((LastRow, state) -> (LastRow, state)) -> m (LastRow, state)
 
 -- run a projection
 class (Monad m) => RunProjection action state m where
   runProjection ::
     Projection action state ->
-    m (NextRow, state)
+    m (LastRow, state)

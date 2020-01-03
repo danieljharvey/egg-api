@@ -1,5 +1,5 @@
 name: egg-api
-version: '1.0.0'
+version: "1.0.0"
 executables:
   app:
     main: Main.hs
@@ -36,6 +36,7 @@ library:
     - QuickCheck
     - wai
     - warp
+    - generic-arbitrary
   ghc-options:
     - -Wall
     - -threaded
@@ -45,7 +46,7 @@ library:
 tests:
   unit-tests:
     main: Main.hs
-    source-dirs: 
+    source-dirs:
       - test
       - lib
     dependencies:
@@ -61,6 +62,7 @@ tests:
       - QuickCheck
       - string-conversions
       - text
+      - generic-arbitrary
       - wai
       - warp
     ghc-options:

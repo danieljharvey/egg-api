@@ -25,7 +25,7 @@ emptyState :: InternalTestState Integer
 emptyState =
   InternalTestState
     []
-    (NextRow 0, def testProjection)
+    (LastRow 0, def testProjection)
 
 main :: IO ()
 main = hspec $ do
@@ -35,30 +35,39 @@ main = hspec $ do
       \x -> fst (runTestEggM' emptyState (pure x)) == (x :: String)
     it "Last projection value is passed through" $ do
       let val =
-            runTestEggM' (InternalTestState [] (NextRow 10, def testProjection)) $
+            runTestEggM' (InternalTestState [] (LastRow 10, def testProjection)) $
               fst <$> getState @Integer
-      fst val `shouldBe` (NextRow 10)
+      fst val `shouldBe` (LastRow 10)
     it "Passes through events" $ do
       let val =
             runTestEggM'
               ( InternalTestState
                   [JSON.toJSON Reset]
-                  ( NextRow 0,
+                  ( LastRow 0,
                     def testProjection
                   )
               )
-              $ getEvents (NextRow 0)
+              $ getEvents (LastRow 0)
       fst val `shouldBe` Map.fromList [((EventId 1), JSON.toJSON Reset)]
     it "Writes an event" $ do
       let val = runTestEggM' emptyState $ do
             writeEvent (toStrict $ JSON.encode Up)
             writeEvent (toStrict $ JSON.encode Down)
-            getEvents (NextRow 0)
+            getEvents (LastRow 0)
       fst val
         `shouldBe` Map.fromList
           [ ((EventId 1), JSON.toJSON Up),
             ((EventId 2), JSON.toJSON Down)
           ]
+    it "Gets zero events the second time" $ do
+      let val = runTestEggM' emptyState $ do
+            writeEvent (toStrict $ JSON.encode Up)
+            writeEvent (toStrict $ JSON.encode Down)
+            (i, _) <- runProjection testProjection -- this should do the event getting
+            getEvents i
+      fst val
+        `shouldBe` Map.fromList
+          []
     it "Runs a projection" $ do
       let val = runTestEggM' emptyState $ do
             writeEvent (toStrict $ JSON.encode Up)
@@ -68,7 +77,7 @@ main = hspec $ do
       -- whats the answer?
       (snd . fst) val `shouldBe` 1
       -- whats the next key?
-      (fst . fst) val `shouldBe` (NextRow 4)
+      (fst . fst) val `shouldBe` (LastRow 3)
     it "Runs a projection in parts gives same result" $ do
       let val = runTestEggM' emptyState $ do
             writeEvent (toStrict $ JSON.encode Up)
@@ -83,7 +92,7 @@ main = hspec $ do
       -- whats the next key?
       (fst <$> fst)
         val
-        `shouldBe` (NextRow 4)
+        `shouldBe` (LastRow 3)
     it "Receives nothing for a stupid API call" $ do
       let (val, _) = runTestEggM' emptyState $ runAPIRequest testProjection testAPI ["load", "of", "rubbish"]
       val `shouldBe` Nothing
@@ -94,6 +103,7 @@ main = hspec $ do
       val `shouldBe` (Just (JSON.String "yo"))
     it "Uses state in the API call" $ do
       let (val, _) = runTestEggM' emptyState $ do
+            writeEvent (toStrict $ JSON.encode Reset)
             writeEvent (toStrict $ JSON.encode Up)
             writeEvent (toStrict $ JSON.encode Up)
             writeEvent (toStrict $ JSON.encode Up)
@@ -103,6 +113,7 @@ main = hspec $ do
       val `shouldBe` (Just (JSON.Number 6))
     it "Runs the projections before the API call" $ do
       let (index, _) = runTestEggM' emptyState $ do
+            writeEvent (toStrict $ JSON.encode Reset)
             writeEvent (toStrict $ JSON.encode Up)
             writeEvent (toStrict $ JSON.encode Up)
             writeEvent (toStrict $ JSON.encode Up)
@@ -110,7 +121,17 @@ main = hspec $ do
             writeEvent (toStrict $ JSON.encode Down)
             _ <- runAPIRequest testProjection testAPI ["Horses"]
             getState @(Integer)
-      (fst index) `shouldBe` (NextRow 6)
+      (fst index) `shouldBe` (LastRow 6)
+    it "Repeated API calls return same answer" $ do
+      let (val, _) = runTestEggM' emptyState $ do
+            writeEvent (toStrict $ JSON.encode Reset)
+            writeEvent (toStrict $ JSON.encode Up)
+            writeEvent (toStrict $ JSON.encode Up)
+            val1 <- runAPIRequest testProjection testAPI ["doubled"]
+            val2 <- runAPIRequest testProjection testAPI ["doubled"]
+            pure (val1, val2)
+      fst val `shouldBe` snd val
+      fst val `shouldBe` Just (JSON.Number 4.0)
 
 -- basic test data
 

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2dc56af3df7a3d572c5dd3f00bb23fdbf1b0476d0fa5e7c286d769131fa4a358
+-- hash: 4acef258420dc825eabaf1b2ab39209a35eb5a5363212071e831996a141eb5e2
 
 name:           egg-api
 version:        1.0.0
@@ -32,6 +32,7 @@ library
     , bytestring
     , containers
     , envy
+    , generic-arbitrary
     , http-types
     , mtl
     , postgresql-simple
@@ -90,6 +91,7 @@ test-suite unit-tests
     , bytestring
     , containers
     , envy
+    , generic-arbitrary
     , hspec
     , http-types
     , mtl

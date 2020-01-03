@@ -29,7 +29,7 @@ instance Arbitrary Board where
 data EggState
   = EggState
       {boards :: Map.Map BoardId Board}
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, JSON.ToJSON, JSON.FromJSON)
 
 empty :: EggState
 empty = EggState mempty
@@ -65,6 +65,17 @@ setElem ax ay item old =
               else item'
         )
 
+expandBoard :: [[TileId]] -> [[TileId]]
+expandBoard as = (map (\a -> a <> [TileId 0]) as) <> [more]
+  where
+    more = (replicate (length as + 1) (TileId 0))
+
+shrinkBoard :: [[a]] -> [[a]]
+shrinkBoard as =
+  map (\a -> take size a) (take size as)
+  where
+    size = max (length as - 1) 1
+
 eggBoardProjection :: Projection BoardActions EggState
 eggBoardProjection =
   Projection
@@ -79,6 +90,24 @@ eggBoardProjection =
             ( Map.adjust
                 ( \(Board a) ->
                     Board $ setElem x' y' tileId' a
+                )
+                boardId'
+                boards'
+            )
+        ExpandBoardAction (ExpandBoard boardId') ->
+          EggState
+            ( Map.adjust
+                ( \(Board a) ->
+                    Board $ expandBoard a
+                )
+                boardId'
+                boards'
+            )
+        ShrinkBoardAction (ShrinkBoard boardId') ->
+          EggState
+            ( Map.adjust
+                ( \(Board a) ->
+                    Board $ shrinkBoard a
                 )
                 boardId'
                 boards'
