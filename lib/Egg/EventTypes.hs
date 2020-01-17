@@ -19,7 +19,7 @@ import Test.QuickCheck.Arbitrary.Generic
 newtype TileId
   = TileId {getTileId :: Int}
   deriving (Eq, Ord, Show)
-  deriving newtype (ToJSON, FromJSON, Arbitrary, Enum, Real, Num, Integral)
+  deriving newtype (FromJSON, ToJSON, Arbitrary, Enum, Real, Num, Integral)
 
 ---
 

@@ -13,8 +13,8 @@ import qualified Data.Aeson as JSON
 import qualified Data.Map as Map
 import Data.Semigroup
 import Egg.EventTypes
-import Egg.Types.Internal
 import GHC.Generics
+import MiniEventStore
 import Test.QuickCheck.Arbitrary
 
 data Board

@@ -1,24 +1,24 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Egg.EventStore where
+module MiniEventStore.EventStore where
 
 import qualified Data.Aeson as JSON
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe, listToMaybe)
-import Egg.Types.Internal
+import MiniEventStore.Types.Internal
 
 type ActionList action =
   M.Map EventId action
 
 -- run all events
-runProjection ::
+runProjectionFromJSON ::
   (JSON.FromJSON action) =>
   EventList ->
   LastRow ->
   state ->
   Projection action state ->
   (LastRow, state)
-runProjection =
+runProjectionFromJSON =
   runProjectionInternal . convertActions
   where
     convertActions =

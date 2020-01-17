@@ -19,8 +19,7 @@ import Data.IORef
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
 import qualified Database.PostgreSQL.Simple as SQL
-import Egg.Types.Instances ()
-import Egg.Types.Internal
+import MiniEventStore
 
 data EggConfig action state
   = EggConfig

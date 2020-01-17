@@ -10,8 +10,8 @@ import qualified Data.Text as T
 import qualified Data.Text.Read as T
 import Egg.EventTypes
 import qualified Egg.SampleProjections as Sample
-import Egg.Types.Internal
 import GHC.Generics
+import MiniEventStore
 
 -- types for our API
 
@@ -23,12 +23,28 @@ data Reply
   = Reply {items :: [T.Text]}
   deriving (Generic, JSON.ToJSON)
 
+data BoardSize
+  = BoardSize
+      { width :: Int,
+        height :: Int
+      }
+  deriving (Generic, JSON.ToJSON)
+
+data LevelResponse
+  = LevelResponse
+      { board :: Sample.Board,
+        levelID :: BoardId,
+        levels :: [BoardId],
+        boardSize :: BoardSize
+      }
+  deriving (Generic, JSON.ToJSON)
+
 sampleAPI :: API Sample.EggState
 sampleAPI state args =
   case args of
     ["state"] -> Just . JSON.toJSON $ state
     ["levels"] -> Just . JSON.toJSON $ getLevelList state
-    ["levels", levelId] -> JSON.toJSON <$> getLevel state levelId
+    ["levels", levelId'] -> JSON.toJSON <$> getLevel state levelId'
     ["get", "some", "eggs"] -> Just . JSON.toJSON . Reply $ ["here are the eggs"]
     ["get", "some", a] -> Just . JSON.toJSON . Reply $ ["here are your", a]
     _ -> Just . JSON.toJSON . Reply $ args
@@ -38,14 +54,29 @@ hush a = case a of
   Right a' -> Just a'
   _ -> Nothing
 
-textToInt :: T.Text -> Maybe Int
-textToInt = hush . (fmap fst) . T.decimal
-
 -- parse text, find level, good times
-getLevel :: Sample.EggState -> T.Text -> Maybe Sample.Board
+getLevel :: Sample.EggState -> T.Text -> Maybe LevelResponse
 getLevel state levelIdString =
   (textToInt levelIdString)
-    >>= (\levelId -> Map.lookup (BoardId levelId) (Sample.boards state))
+    >>= getLevel'
+    >>= makeResponse
+  where
+    textToInt =
+      hush . (fmap fst) . T.decimal
+    getLevel' levelId' =
+      ((,) levelId')
+        <$> Map.lookup (BoardId levelId') (Sample.boards state)
+    makeResponse (levelId', board') =
+      pure $
+        LevelResponse
+          board'
+          (BoardId levelId')
+          (getLevelList state)
+          (getBoardSize board')
+
+getBoardSize :: Sample.Board -> BoardSize
+getBoardSize (Sample.Board as) =
+  BoardSize (length as) (length as)
 
 getLevelList :: Sample.EggState -> [BoardId]
 getLevelList state =

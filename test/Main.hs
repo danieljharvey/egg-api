@@ -13,10 +13,9 @@ module Main where
 import qualified Data.Aeson as JSON
 import Data.ByteString.Lazy (toStrict)
 import qualified Data.Map as Map
-import Egg.Types.Instances ()
-import Egg.Types.Internal
 import EggAPI.EggAPISpec
 import GHC.Generics
+import MiniEventStore
 import Test.Hspec
 import Test.QuickCheck
 import TestEggM

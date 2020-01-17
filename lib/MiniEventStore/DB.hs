@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Egg.DB where
+module MiniEventStore.DB where
 
 import qualified Data.ByteString.Char8 as BS8
 import Data.Function ((&))

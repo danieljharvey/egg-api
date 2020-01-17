@@ -10,8 +10,7 @@ import qualified Data.Aeson as JSON
 import Data.ByteString.Lazy (fromStrict)
 import qualified Data.Map as Map
 import Data.Semigroup
-import Egg.Types.Instances ()
-import Egg.Types.Internal
+import MiniEventStore
 
 data InternalTestState s
   = InternalTestState

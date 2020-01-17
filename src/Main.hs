@@ -12,10 +12,9 @@ import Data.IORef
 import qualified Data.Text as Tx
 import qualified Database.PostgreSQL.Simple as SQL
 import qualified Egg.API as API
-import qualified Egg.DB as DB
 import qualified Egg.EggM as Egg
 import qualified Egg.SampleProjections as Sample
-import Egg.Types.Internal
+import qualified MiniEventStore as MES
 import qualified Network.HTTP.Types as HTTP
 import qualified Network.Wai as Wai
 import qualified Network.Wai.Handler.Warp as Warp
@@ -28,13 +27,13 @@ main = do
   case config' of
     Nothing -> putStrLn "Could not read env vars"
     Just config -> do
-      let settings = DB.makeSettings config
-      connection <- SQL.connectPostgreSQL (DB.configDatabase config)
-      DB.createSchema connection
+      let settings = MES.makeSettings config
+      connection <- SQL.connectPostgreSQL (MES.configDatabase config)
+      MES.createSchema connection
       ioRef <-
         newIORef
-          ( (LastRow 0),
-            def Sample.eggBoardProjection
+          ( (MES.LastRow 0),
+            MES.def Sample.eggBoardProjection
           )
       let eggConfig = Egg.makeConfig connection Sample.eggBoardProjection API.sampleAPI ioRef
       Warp.runSettings settings (application eggConfig)
@@ -54,9 +53,9 @@ requestHandler ::
   ( JSON.FromJSON action,
     Show state,
     MonadIO m,
-    GetEvents m,
-    CacheState state m,
-    WriteEvent m,
+    MES.GetEvents m,
+    MES.CacheState state m,
+    MES.WriteEvent m,
     MonadReader (Egg.EggConfig action state) m
   ) =>
   Wai.Request ->
@@ -68,13 +67,13 @@ requestHandler request =
 
 -- post means plop an event in the store
 handlePostRequest ::
-  ( WriteEvent m
+  ( MES.WriteEvent m
   ) =>
   BS8.ByteString ->
   m Wai.Response
 handlePostRequest jsonStr = do
   -- write the event
-  writeEvent jsonStr
+  MES.writeEvent jsonStr
   let status = HTTP.status200
   let headers = []
   let body = "Saved!"
@@ -82,8 +81,8 @@ handlePostRequest jsonStr = do
 
 handleGetRequest ::
   ( JSON.FromJSON action,
-    GetEvents m,
-    CacheState state m,
+    MES.GetEvents m,
+    MES.CacheState state m,
     MonadReader (Egg.EggConfig action state) m
   ) =>
   [Tx.Text] ->
@@ -92,7 +91,7 @@ handleGetRequest args = do
   -- lets assume this is get and try and access the API
   projection' <- asks Egg.projection
   api' <- asks Egg.api
-  response <- runAPIRequest projection' api' args
+  response <- MES.runAPIRequest projection' api' args
   case response of
     Just a ->
       pure

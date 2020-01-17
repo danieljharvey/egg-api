@@ -6,11 +6,11 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Egg.Types.Instances where
+module MiniEventStore.Types.Instances where
 
 import qualified Data.Aeson as JSON
-import qualified Egg.EventStore as EventStore
-import Egg.Types.Internal
+import qualified MiniEventStore.EventStore as EventStore
+import MiniEventStore.Types.Internal
 
 instance
   ( JSON.FromJSON action,
@@ -34,6 +34,6 @@ instance
   runProjection projection' = do
     (oldIndex, oldState) <- getState @state
     events' <- getEvents oldIndex
-    let (newIndex, newState) = EventStore.runProjection events' oldIndex oldState projection'
+    let (newIndex, newState) = EventStore.runProjectionFromJSON events' oldIndex oldState projection'
     putState newIndex newState
     pure (newIndex, newState)

@@ -15,6 +15,7 @@ executables:
       - http-types
       - postgresql-simple
       - containers
+      - unordered-containers
       - mtl
       - text
       - QuickCheck
@@ -32,6 +33,7 @@ library:
     - postgresql-simple
     - mtl
     - string-conversions
+    - unordered-containers
     - text
     - QuickCheck
     - wai
@@ -63,6 +65,7 @@ tests:
       - string-conversions
       - text
       - generic-arbitrary
+      - unordered-containers
       - wai
       - warp
     ghc-options:

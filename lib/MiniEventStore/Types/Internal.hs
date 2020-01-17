@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Egg.Types.Internal where
+module MiniEventStore.Types.Internal where
 
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Char8 as BS8
