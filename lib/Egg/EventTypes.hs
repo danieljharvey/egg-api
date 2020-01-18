@@ -13,6 +13,7 @@ import Data.Aeson
 import GHC.Generics
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Arbitrary.Generic
+import Test.QuickCheck.Gen
 
 --
 
@@ -37,6 +38,16 @@ newtype BoardId
       Real,
       Integral
     )
+
+---
+
+data RotateDirection
+  = Clockwise
+  | AntiClockwise
+  deriving (Eq, Ord, Show, Generic)
+
+instance Arbitrary RotateDirection where
+  arbitrary = genericArbitrary
 
 ---
 
@@ -155,11 +166,50 @@ instance ToJSON ShrinkBoard where
 
 ---
 
+data RotateBoard
+  = RotateBoard
+      { rotateBoardId :: BoardId,
+        rotateDirection :: RotateDirection
+      }
+  deriving (Eq, Ord, Show, Generic)
+
+instance Arbitrary RotateBoard where
+  arbitrary = genericArbitrary
+
+instance FromJSON RotateBoard where
+  parseJSON = withObject "rotateBoard" $ \o -> do
+    type' <- o .: "type"
+    when ((type' :: String) /= "rotate_board") $ fail "Wrong type"
+    boardId' <- o .: "boardId"
+    direction' <- o .: "direction"
+    case (direction' :: String) of
+      "clockwise" -> pure (RotateBoard boardId' Clockwise)
+      "anticlockwise" -> pure (RotateBoard boardId' AntiClockwise)
+      _ -> fail "Unknown direction"
+
+instance ToJSON RotateBoard where
+  toJSON (RotateBoard rotateBoardId' direction) =
+    object
+      [ "type" .= String "rotate_board",
+        "boardId"
+          .= Number
+            (fromIntegral rotateBoardId'),
+        "direction"
+          .= String
+            ( if direction == Clockwise
+                then "clockwise"
+                else "anticlockwise"
+            )
+      ]
+
+---
+
 data BoardActions
   = NewBoardAction NewBoard
   | AddTileAction AddTile
   | ExpandBoardAction ExpandBoard
   | ShrinkBoardAction ShrinkBoard
+  | RotateBoardAction RotateBoard
   deriving (Eq, Ord, Show, Generic)
 
 instance Arbitrary BoardActions where
@@ -171,9 +221,11 @@ instance FromJSON BoardActions where
       <|> (AddTileAction <$> parseJSON a)
       <|> (ExpandBoardAction <$> parseJSON a)
       <|> (ShrinkBoardAction <$> parseJSON a)
+      <|> (RotateBoardAction <$> parseJSON a)
 
 instance ToJSON BoardActions where
   toJSON (NewBoardAction a) = toJSON a
   toJSON (AddTileAction a) = toJSON a
   toJSON (ExpandBoardAction a) = toJSON a
   toJSON (ShrinkBoardAction a) = toJSON a
+  toJSON (RotateBoardAction a) = toJSON a
