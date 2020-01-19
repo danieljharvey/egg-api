@@ -40,7 +40,7 @@ expectedBoard =
 expectedBoardResponse :: API.LevelResponse
 expectedBoardResponse =
   API.LevelResponse
-    expectedBoard
+    (API.boardToTileBoard expectedBoard)
     (BoardId 1)
     (pure (BoardId 1))
     (API.BoardSize 2 2)
