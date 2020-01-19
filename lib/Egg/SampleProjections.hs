@@ -28,6 +28,10 @@ instance Arbitrary Board where
     items <- arbitrary
     pure . coordListToBoard . boardToCoordList $ Board items
 
+newtype TileBoard
+  = TileBoard {getTileBoard :: [[Tile]]}
+  deriving (Eq, Show, Generic, JSON.ToJSON, JSON.FromJSON)
+
 data EggState
   = EggState
       {boards :: Map.Map BoardId Board}

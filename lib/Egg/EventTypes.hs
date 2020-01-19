@@ -24,6 +24,12 @@ newtype TileId
 
 ---
 
+data Tile
+  = Tile {id :: TileId}
+  deriving (Eq, Ord, Show, Generic, FromJSON, ToJSON)
+
+---
+
 newtype BoardId
   = BoardId {getBoardId :: Int}
   deriving (Eq, Ord, Show)
@@ -86,7 +92,7 @@ data AddTile
   = AddTile
       { x :: Int,
         y :: Int,
-        tileId :: TileId,
+        addTileId :: TileId,
         tileBoardId :: BoardId
       }
   deriving (Eq, Ord, Show, Generic)

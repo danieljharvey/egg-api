@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Egg.API where
@@ -30,9 +32,18 @@ data BoardSize
       }
   deriving (Generic, JSON.ToJSON)
 
+newtype TileBoard
+  = TileBoard {getTileBoard :: [[Tile]]}
+  deriving (Eq, Show, Generic)
+  deriving newtype (JSON.ToJSON, JSON.FromJSON)
+
+boardToTileBoard :: Sample.Board -> TileBoard
+boardToTileBoard (Sample.Board tiles) =
+  TileBoard $ (fmap . fmap) Tile tiles
+
 data LevelResponse
   = LevelResponse
-      { board :: Sample.Board,
+      { board :: TileBoard,
         levelID :: BoardId,
         levels :: [BoardId],
         boardSize :: BoardSize
@@ -69,7 +80,7 @@ getLevel state levelIdString =
     makeResponse (levelId', board') =
       pure $
         LevelResponse
-          board'
+          (boardToTileBoard board')
           (BoardId levelId')
           (getLevelList state)
           (getBoardSize board')
