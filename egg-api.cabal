@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 529c9e357772af615462576edb7c4e1baa0c94c835d4ae188324566e2896bdc4
+-- hash: 7860e82f63f604ec5317c15325e2273b8575c5b64aa28cc26e5d494e223d73ef
 
 name:           egg-api
 version:        1.0.0
@@ -21,6 +21,7 @@ library
       MiniEventStore.EventStore
       MiniEventStore.Types.Instances
       MiniEventStore.Types.Internal
+      Server.Types
   other-modules:
       Paths_egg_api
   hs-source-dirs:
@@ -37,6 +38,9 @@ library
     , http-types
     , mtl
     , postgresql-simple
+    , servant
+    , servant-client
+    , servant-server
     , string-conversions
     , text
     , unordered-containers
@@ -61,6 +65,9 @@ executable app
     , http-types
     , mtl
     , postgresql-simple
+    , servant
+    , servant-client
+    , servant-server
     , text
     , unordered-containers
     , wai
@@ -83,6 +90,7 @@ test-suite unit-tests
       MiniEventStore.EventStore
       MiniEventStore.Types.Instances
       MiniEventStore.Types.Internal
+      Server.Types
       Paths_egg_api
   hs-source-dirs:
       test

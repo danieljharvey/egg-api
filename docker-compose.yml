@@ -2,6 +2,7 @@ version: '2'
 services:
   web:
     container_name: egg-api
+    restart: always
     build: .
     depends_on:
       - db
@@ -11,6 +12,10 @@ services:
       - .:/project
     image: danieljamesharvey/egg-api
     environment:
-      - DATABASE=host=db user=postgres
+      - DATABASE=host=db user=postgres password=password
   db:
     image: 'postgres:9.6'
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "password"
+      POSTGRES_HOST_AUTH_METHOD: trust

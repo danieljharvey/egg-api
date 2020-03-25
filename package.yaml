@@ -20,6 +20,9 @@ executables:
       - text
       - QuickCheck
       - bytestring
+      - servant
+      - servant-server
+      - servant-client
 
 library:
   source-dirs: lib
@@ -39,6 +42,10 @@ library:
     - wai
     - warp
     - generic-arbitrary
+    - servant
+    - servant-server
+    - servant-client
+
   ghc-options:
     - -Wall
     - -threaded
