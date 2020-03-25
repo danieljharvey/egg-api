@@ -14,13 +14,23 @@ import GHC.Generics
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Arbitrary.Generic
 import Test.QuickCheck.Gen
+import Web.Internal.HttpApiData
 
 --
 
 newtype TileId
   = TileId {getTileId :: Int}
   deriving (Eq, Ord, Show)
-  deriving newtype (FromJSON, ToJSON, Arbitrary, Enum, Real, Num, Integral)
+  deriving newtype
+    ( FromJSON,
+      ToJSON,
+      FromHttpApiData,
+      Arbitrary,
+      Enum,
+      Real,
+      Num,
+      Integral
+    )
 
 ---
 
@@ -37,6 +47,7 @@ newtype BoardId
     ( ToJSON,
       FromJSON,
       ToJSONKey,
+      FromHttpApiData,
       FromJSONKey,
       Enum,
       Arbitrary,
@@ -51,6 +62,11 @@ data RotateDirection
   = Clockwise
   | AntiClockwise
   deriving (Eq, Ord, Show, Generic)
+
+instance FromHttpApiData RotateDirection where
+  parseUrlPiece "clockwise" = pure Clockwise
+  parseUrlPiece "anticlockwise" = pure AntiClockwise
+  parseUrlPiece _ = Left "Direction not recognised"
 
 instance Arbitrary RotateDirection where
   arbitrary = genericArbitrary
