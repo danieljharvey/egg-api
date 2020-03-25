@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7860e82f63f604ec5317c15325e2273b8575c5b64aa28cc26e5d494e223d73ef
+-- hash: c6aee4e1124db00c6df9bd01005cc4dc754930551098f799772174a78dd83892
 
 name:           egg-api
 version:        1.0.0
@@ -108,6 +108,9 @@ test-suite unit-tests
     , http-types
     , mtl
     , postgresql-simple
+    , servant
+    , servant-client
+    , servant-server
     , string-conversions
     , text
     , unordered-containers

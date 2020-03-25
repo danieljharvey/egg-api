@@ -19,7 +19,8 @@ import qualified MiniEventStore as MES
 import Servant
 
 type PostAPI action =
-  ReqBody '[JSON] action :> Post '[JSON] String
+  "post" :> ReqBody '[JSON] action
+    :> Post '[JSON] String
 
 -- api for posting new events
 postAPI ::

@@ -86,14 +86,6 @@ eggAPISpec = do
               Sample.eggBoardProjection
       state `shouldBe` expectedState
       lastRow `shouldBe` (MES.LastRow 3)
-    it "Makes a board and sets tiles" $ do
-      let (state, (InternalTestState _ (lastRow, _))) = runTestEggM' emptyState' $ do
-            writeEvent' $ NewBoard 2 2 1
-            writeEvent' $ AddTile 0 1 1 1
-            writeEvent' $ AddTile 1 0 1 1
-            MES.runAPIRequest Sample.eggBoardProjection API.sampleAPI ["levels", "1"]
-      lastRow `shouldBe` (MES.LastRow 3)
-      state `shouldBe` Just (JSON.toJSON expectedBoardResponse)
     it "Expands the board" $ do
       let events =
             Map.fromList

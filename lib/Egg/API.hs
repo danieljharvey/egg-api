@@ -13,19 +13,12 @@ import Control.Monad.Reader
 import qualified Data.Aeson as JSON
 import qualified Data.Map as Map
 import qualified Data.Text as T
-import qualified Data.Text.Read as T
 import qualified Egg.EggM as Egg
 import Egg.EventTypes
 import qualified Egg.SampleProjections as Sample
 import GHC.Generics
 import qualified MiniEventStore as MES
 import Servant
-
--- types for our API
-
--- let's not get too clever
--- we take the state and a request string
--- and maybe return something good
 
 data Reply
   = Reply {items :: [T.Text]}
@@ -55,16 +48,6 @@ data LevelResponse
         boardSize :: BoardSize
       }
   deriving (Generic, JSON.ToJSON)
-
-sampleAPI :: MES.API Sample.EggState
-sampleAPI state args =
-  case args of
-    ["state"] -> Just . JSON.toJSON $ state
-    ["levels"] -> Just . JSON.toJSON $ getLevelList state
-    ["levels", levelId'] -> JSON.toJSON <$> getLevelOld state levelId'
-    ["get", "some", "eggs"] -> Just . JSON.toJSON . Reply $ ["here are the eggs"]
-    ["get", "some", a] -> Just . JSON.toJSON . Reply $ ["here are your", a]
-    _ -> Just . JSON.toJSON . Reply $ args
 
 type EggServerAPI state =
   StateAPI state
@@ -147,26 +130,6 @@ hush :: Either e a -> Maybe a
 hush a = case a of
   Right a' -> Just a'
   _ -> Nothing
-
--- parse text, find level, good times
-getLevelOld :: Sample.EggState -> T.Text -> Maybe LevelResponse
-getLevelOld state levelIdString =
-  (textToInt levelIdString)
-    >>= getLevel'
-    >>= makeResponse
-  where
-    textToInt =
-      hush . (fmap fst) . T.decimal
-    getLevel' levelId' =
-      ((,) levelId')
-        <$> Map.lookup (BoardId levelId') (Sample.boards state)
-    makeResponse (levelId', board') =
-      pure $
-        LevelResponse
-          (boardToTileBoard board')
-          (BoardId levelId')
-          (getLevelList state)
-          (getBoardSize board')
 
 -- find level, good times
 getLevel :: Sample.EggState -> Int -> Maybe LevelResponse
