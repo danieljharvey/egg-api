@@ -23,7 +23,9 @@ import Servant
 import Server.Types
 import qualified System.Envy as Envy
 
-type EggAPI = PostAPI Actions.BoardActions :<|> API.EggServerAPI Sample.EggState
+type EggAPI =
+  PostAPI Actions.BoardActions
+    :<|> API.EggServerAPI Sample.EggState
 
 eggAPI :: Proxy EggAPI
 eggAPI = Proxy
