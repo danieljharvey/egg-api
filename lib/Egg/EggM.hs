@@ -24,7 +24,6 @@ import MiniEventStore
 data EggConfig action state
   = EggConfig
       { dbConnection :: SQL.Connection,
-        api :: API state,
         projection :: Projection action state,
         cachedState :: IORef (LastRow, state)
       }
@@ -33,13 +32,11 @@ makeConfig ::
   JSON.FromJSON action =>
   SQL.Connection ->
   Projection action state ->
-  API state ->
   IORef (LastRow, state) ->
   EggConfig action state
-makeConfig c p api' ioRef =
+makeConfig c p ioRef =
   EggConfig
     { dbConnection = c,
-      api = api',
       projection = p,
       cachedState = ioRef
     }
