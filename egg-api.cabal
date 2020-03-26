@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c6aee4e1124db00c6df9bd01005cc4dc754930551098f799772174a78dd83892
+-- hash: 7b4a84e7eb3ec22ee37eea7992afc885055f41c3b53486ea349483ebc817a23e
 
 name:           egg-api
 version:        1.0.0
@@ -15,6 +15,7 @@ library
       Egg.API
       Egg.EggM
       Egg.EventTypes
+      Egg.PostEventsAPI
       Egg.SampleProjections
       MiniEventStore
       MiniEventStore.DB
@@ -35,6 +36,7 @@ library
     , containers
     , envy
     , generic-arbitrary
+    , http-api-data
     , http-types
     , mtl
     , postgresql-simple
@@ -84,6 +86,7 @@ test-suite unit-tests
       Egg.API
       Egg.EggM
       Egg.EventTypes
+      Egg.PostEventsAPI
       Egg.SampleProjections
       MiniEventStore
       MiniEventStore.DB
@@ -105,6 +108,7 @@ test-suite unit-tests
     , envy
     , generic-arbitrary
     , hspec
+    , http-api-data
     , http-types
     , mtl
     , postgresql-simple

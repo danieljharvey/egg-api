@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -12,6 +13,7 @@ import qualified Database.PostgreSQL.Simple as SQL
 import qualified Egg.API as API
 import qualified Egg.EggM as Egg
 import qualified Egg.EventTypes as Actions
+import Egg.PostEventsAPI
 import qualified Egg.SampleProjections as Sample
 import qualified MiniEventStore as MES
 import Network.HTTP.Types.Header
@@ -20,11 +22,10 @@ import qualified Network.Wai as Wai
 import qualified Network.Wai.Handler.Warp as Warp
 import Network.Wai.Middleware.Cors
 import Servant
-import Server.Types
 import qualified System.Envy as Envy
 
 type EggAPI =
-  PostAPI Actions.BoardActions
+  "post" :> PostEventsAPI
     :<|> API.EggServerAPI Sample.EggState
 
 eggAPI :: Proxy EggAPI
@@ -34,7 +35,7 @@ eggAPIServer ::
   Egg.EggConfig Actions.BoardActions Sample.EggState ->
   Server EggAPI
 eggAPIServer config =
-  postAPI config :<|> API.eggServerAPI config
+  postEvents config :<|> API.eggServerAPI config
 
 eggApplication ::
   Egg.EggConfig Actions.BoardActions Sample.EggState ->

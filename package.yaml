@@ -41,6 +41,7 @@ library:
     - QuickCheck
     - wai
     - warp
+    - http-api-data
     - generic-arbitrary
     - servant
     - servant-server
@@ -65,6 +66,7 @@ tests:
       - containers
       - envy
       - http-types
+      - http-api-data
       - hspec
       - postgresql-simple
       - mtl

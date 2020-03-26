@@ -124,7 +124,6 @@ getUpdatedProjectionState = do
   (_, state') <- MES.runProjection projection'
   pure state'
 
-----
 --
 hush :: Either e a -> Maybe a
 hush a = case a of
